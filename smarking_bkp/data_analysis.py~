@@ -1,0 +1,316 @@
+import os
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+import sys
+
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn import svm
+
+contracts=[]
+transients=[]
+
+#flags to determine whether contracts or transient was found
+con = 0
+tran = 0
+
+
+#we have collected all the data in a file, total 8040 datapoints per garage
+#each datapoint is for an hour in a given day
+ 
+with open("smarking_occupancy_small") as f:
+    content = f.readlines()
+
+#line_index=1
+for line in content:
+#parse each line, each line is in json format
+    garage_info = json.loads(line)
+
+    #objects to store the parsed result
+    contract = []
+    transient = []
+    for item in garage_info["value"]:
+        group = str(item.get("group"))
+        if('Contract' in group):    
+            contract = item.get("value")
+            con = 1
+        elif('Transient' in group):
+            transient = item.get("value")
+            tran = 1
+
+    if ((con == 0) and (tran == 0)):
+        continue
+    if (con == 0):
+        l = len(transient)
+        contract = [0] * l
+    if (tran == 0):
+        l = len(contract)
+        transient = [0] * l
+    #add the parsed result to the master list                           
+    contracts.append(contract)                                          
+    transients.append(transient)
+    
+    #reset the values of flags
+    con = 0
+    tran = 0
+
+    #print "done ",line_index
+    #line_index =  line_index + 1
+#STAGE 2:  Form the peak occupancy list
+
+#print contracts
+#print transients
+#for i in np.arange(0, len(contracts)):
+#    print contracts[i]
+#    print transients[i]
+months=[]
+jan = []
+feb = []
+mar = []
+apr = []
+may = []
+jun = []
+jul = []
+aug = []
+sep = []
+oct = []
+nov = []
+dec = []
+
+#form the peak occupancy for each month for all the garages
+
+#result
+#jan = [[max1_con, max1_tran], [max2_con, max2_tran]...] for n garages
+#feb = [[max1_con, max1_tran], [max2_con, max2_tran]...] for n garages
+
+#we have different processing scheme for leap year.
+
+for i in np.arange(0, len(contracts)):
+    l = []
+    #jan
+    l.append(np.amax(contracts[i][0:31*24]))
+    l.append(np.amax(transients[i][0:31*24]))
+    jan.append(l)
+    #feb                                                                           
+    l = []
+
+    l.append(np.amax(contracts[i][31*24+1:60*24]))
+    l.append(np.amax(transients[i][31*24+1:60*24]))
+    feb.append(l)
+    #mar                                                                        
+    l = []
+    l.append(np.amax(contracts[i][60*24+1:91*24]))
+    l.append(np.amax(transients[i][60*24+1:91*24]))
+    mar.append(l)
+    #apr                                                                        
+    l = []
+    l.append(np.amax(contracts[i][91*24+1:121*24]))
+    l.append(np.amax(transients[i][91*24+1:121*24]))
+    apr.append(l)
+    #may                                                                        
+    l = []
+    l.append(np.amax(contracts[i][121*24+1:152*24]))
+    l.append(np.amax(transients[i][121*24+1:152*24]))
+    may.append(l)
+    #jun                
+    
+    l = []                                                  
+    l.append(np.amax(contracts[i][152*24+1:182*24]))
+    l.append(np.amax(transients[i][152*24+1:182*24]))
+    jun.append(l)
+    #jul                                                                        
+    l = []
+    l.append(np.amax(contracts[i][182*24+1:213*24]))
+    l.append(np.amax(transients[i][182*24+1:213*24]))
+    jul.append(l)
+    #aug                                                                        
+    l = []
+    l.append(np.amax(contracts[i][213*24+1:244*24]))
+    l.append(np.amax(transients[i][213*24+1:244*24]))
+    aug.append(l)
+    #sep                                                                        
+    l = []
+    l.append(np.amax(contracts[i][244*24+1:274*24]))
+    l.append(np.amax(transients[i][244*24+1:274*24]))
+    sep.append(l)
+    #oct                                                                        
+    l = []
+    l.append(np.amax(contracts[i][274*24+1:305*24]))
+    l.append(np.amax(transients[i][274*24+1:305*24]))
+    oct.append(l)
+    #nov                                                                        
+    l = []
+    l.append(np.amax(contracts[i][305*24+1:335*24]))
+    l.append(np.amax(transients[i][305*24+1:335*24]))
+    nov.append(l)
+    #dec                                                                        
+months.append(jan)
+months.append(feb)
+months.append(mar)
+months.append(apr)
+months.append(may)
+months.append(jun)
+months.append(jul)
+months.append(aug)
+months.append(sep)
+months.append(oct)
+months.append(nov)
+months.append(dec)
+
+#print months
+
+#lets plot the peak occupancy just for the verification purpose
+#t=[]
+#months[month_index][garage_index][transient/contract]
+#for i in np.arange(0, 11):
+#    t.append(months[i][0][0])
+#for i in t:
+#    print i   
+
+#STAGE 3:  Anomaly Detection
+
+training_data=[]                                                                
+for i in np.arange(0, len(contracts)):                                             
+    t = []                                      
+    for j in np.arange(0, 11):
+        t.append(months[j][i][0])
+    training_data.append(t)                                                    
+print training_data 
+#training data looks like this:                                                 
+#   [[gar1_jan_max, gar1_feb_max, ..., gar1_dec_max],                         
+#    [gar2_jan_max, gar2_feb_max, ..., gar2_dec_max],
+#     ....                                                                     #    [garn_jan_max, garn_feb_max, ..., garn_dec_max]]
+
+
+#STAGE 3.1:  Detecting "Gaps" in monthly peak occupancy:
+
+#Algorithm (detecting possible faulty data with 0's):
+#  if 0 in max(month) for a garage; REPORT -> severe gap
+#  if within a month, values for two consecutive days == 0; return medium gap
+
+
+
+#Algorithm (detecting non zero gaps):
+
+# If data points fall beyond 3 IQR 
+#    If weekend -> continue (return more analysis)
+#    Else REPORT.
+
+#STAGE 3.2:  
+'''
+#STAGE 3.3:  Apply Clustering
+#months[month_index][garage_index][transient/contract]
+
+#first algorithm: DBSCAN (automatically detects number of clusters)
+
+training_data=[]
+
+for i in np.arange(0, len(contracts)):
+    t = []
+    for j in np.arange(0, 11):                                                         t.append(months[j][i][0])
+    training_data.append(t)
+
+#training data looks like this:
+#   [[gar1_jan_max, gar1_feb_max, ..., gar1_dec_max],
+#    [gar2_jan_max, gar2_feb_max, ..., gar2_dec_max],
+#     ....
+#    [garn_jan_max, garn_feb_max, ..., garn_dec_max]]
+
+#print dim(training_data)
+data = np.array(training_data)
+
+#print data
+stscaler = StandardScaler().fit(data)
+data = stscaler.transform(data)
+
+#print data
+db = DBSCAN(eps=0.3, min_samples=1).fit(data)
+core_samples = db.core_sample_indices_
+labels = db.labels_
+print labels
+n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+print n_clusters_
+
+
+#second algorithm: one class SVM (used in text processing for outlier detection)
+clf = svm.OneClassSVM(nu=0.95 * 0.25 + 0.05, kernel="rbf", gamma=0.1)
+clf.fit(data)
+y_pred = clf.predict(data)
+
+print y_pred
+
+#third algorithm:  IsolationForest (same as before)
+#what is contamination?
+
+rng = np.random.RandomState(42)
+
+clf = IsolationForest( contamination=0.25, random_state=rng)
+clf.fit(data)
+y_pred = clf.predict(data)
+
+print y_pred
+
+'''
+
+'''
+#STAGE 1:  Getting all the data 
+#______________________________
+
+#get hourly data for garages and plot it
+
+#ren, BAFC, Three Allen Center, 500 Jefferson, Jacksonville
+garage_ids = [917572, 780376, 118941, 579742, 440959]
+
+#get hourly occupancy starting from Feb 3 2015 to Nov 30 2016
+start_date = ["2015-02-03T00:00:00"]
+hours_needed = [16008]
+
+#objects to store the results
+contracts = []
+transients = []
+
+for id in garage_ids:
+    for date in start_date:
+        for hour in hours_needed:
+            #print id
+            #creating the curl link for OCCUPANCY
+            url = "https://my.smarking.net/api/ds/v3/garages/"
+            url = url + str(id)
+            url = url + "/past/occupancy/from/"+date+"/"+str(hour)+"/1h?gb=User+Type"
+            #print url
+            url = 'curl "' + url+ '" -H "Authorization:Bearer vgrh8F1EuhQdVO2A1wQdCPFf38WHDHX-lXJR-2Dt"'
+            print url 
+            result = os.popen(url).read()
+            #print result
+
+            #parse the json file
+            garage_info = json.loads(result)
+
+            #objects to store the parsed result
+            contract = []
+            transient = []
+            for item in garage_info["value"]:
+                group = str(item.get("group"))
+                if('Contract' in group):    
+                    contract = item.get("value")
+                else:
+                    transient = item.get("value")
+            
+            #add the parsed result to the master list
+            contracts.append(contract)
+            transients.append(transient)
+            #print "contract",contract
+            #print "transient",transient
+            #plot them
+            #x = np.arange(0, len(contract))
+            #print x
+            #print contract
+            #fig = plt.figure()
+            #ax = plt.axes()
+            #ax.plot(x, contract)
+            #ax.plot(x, transient)
+
+            #plt.show()
+
+'''

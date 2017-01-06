@@ -1,0 +1,54 @@
+import os
+import json
+import matplotlib.pyplot as plt
+import numpy as np
+
+#get hourly data for garages and plot it
+
+garage_ids = [917572]
+start_date=["2015-02-02T00:00:00"]
+hours_needed=[648]
+for id in garage_ids:
+    for date in start_date:
+        for hour in hours_needed:
+            #print id
+            #creating the curl link for OCCUPANCY
+            url = "https://my.smarking.net/api/ds/v3/garages/"
+            url = url + str(id)
+            url = url + "/past/occupancy/from/"+date+"/"+str(hour)+"/1h?gb=User+Type"
+            #print url
+            url = 'curl "' + url+ '" -H "Authorization:Bearer vgrh8F1EuhQdVO2A1wQdCPFf38WHDHX-lXJR-2Dt"'
+            #print url 
+            result = os.popen(url).read()
+            #print result
+
+            #parse the json file
+            garage_info = json.loads(result)
+
+
+            contract = []
+            transient = []
+            for item in garage_info["value"]:
+                group = str(item.get("group"))
+                if('Contract' in group):    
+                    contract = item.get("value")
+                else:
+                    transient = item.get("value")
+
+            #print "contract",contract
+            #print "transient",transient
+            #plot them
+            x = np.arange(0, len(contract))
+            print x
+            print contract
+            fig = plt.figure()
+            ax = plt.axes()
+            ax.plot(x, contract)
+            ax.plot(x, transient)
+
+            plt.show()
+#for i in value:
+                #    print i
+                #for i in value:
+                #    print value 
+            #print garage_info
