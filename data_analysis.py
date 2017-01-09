@@ -1,8 +1,12 @@
+print "Importing libraries"
 import os
 import json
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+import pandas as pd
+import shutil
+
 
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
@@ -16,7 +20,7 @@ con = 0
 tran = 0
 
 
-
+print "Analyzing data..."
 #we have collected all the data in a file, total 8040 datapoints per garage
 #each datapoint is for an hour in a given day
 #get the garage names                                                           
@@ -191,6 +195,7 @@ months_max_occ.append(nov)
 months_max_occ.append(dec)
 
 
+
 #lets plot the peak occupancy just for the verification purpose
 #t=[]
 #months_max_occ [month_index][garage_index][transient/contract]
@@ -206,7 +211,7 @@ months_max_occ.append(dec)
 training_data=[]        
 #list that holds indices of garages in the
 #training data from the master garage
-training_garages=[]             
+training_garages=[] 
                                            
 #dealing with contracts
 #forming the training data set
@@ -264,38 +269,46 @@ for i in np.arange(0, len(training_data)):
     
         for t  in training_data[i]:
             if t < lower or t > upper:
-                print t, " is not between ", lower, " and ", upper
+                #print t, " is not between ", lower, " and ", upper
                 anomaly_present[i] = 2
                 break
 
 #print the anomaly results
 #  garage_list holds the ID of garages as read from the
 # garage_list file
-print "Anomaly category 1: Peak Occupancy for Contracts"
-print "______________________________________________"
+print "Anomaly category 1: MONTHLY Peak Occupancy"
+print "__________________________________________"
 
 if not os.path.exists("./contracts"):
     os.makedirs("./contracts")
+else:
+    shutil.rmtree("./contracts")
 if not os.path.exists("./contracts/zero_gap"):
     os.makedirs("./contracts/zero_gap")
-if not os.path.exists("./contracts/gap"):
-    os.makedirs("./contracts/gap")
+if not os.path.exists("./contracts/unusual"):
+    os.makedirs("./contracts/unusual")
 
+#create date ranges
+#TODO dynamic date range
+dates = pd.bdate_range('2016-1-1', '2016-11-30', freq='M')
+
+total_anomaly_z = 0
+total_anomaly_g = 0
 
 for i in np.arange(0, len(training_data)):
     #if (anomaly_present[i] == 0):
     #    print i, "OK"
     if (anomaly_present[i] == 1):
         #print garage_list[i].rstrip('\n'), " has 'zero gap' anomaly"
-        print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
-        
+        #print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
+        total_anomaly_z = total_anomaly_z +1
         #extract from original dataset for plotting
         k=[]
         for m in np.arange(0,11):
             k.append(months_max_occ[m][training_garages[i]][0])
         plt.ylim(0,np.amax(k))
 
-        plt.plot(k)
+        plt.plot(dates,k)
         
         #plot
         filename = "./contracts/zero_gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
@@ -303,26 +316,31 @@ for i in np.arange(0, len(training_data)):
         plt.clf()
 
     if (anomaly_present[i] == 2):
-        print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
-        
+        #print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
+        total_anomaly_g = total_anomaly_g +1
         #extract from original dataset for plotting
         k=[]
         for m in np.arange(0,11):
             k.append(months_max_occ[m][training_garages[i]][0])
         plt.ylim(0,np.amax(k))
 
-        plt.plot(k)
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,k)
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Contracts)')
         
-        filename = "./contracts/gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
+        filename = "./contracts/unusual/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
         plt.savefig(filename)
         plt.clf()
 
+#PRINT SUMMARY STATS
+print "Out of ", len(garage_list), " garages ", total_anomaly_z, " 'zero gap' and ", total_anomaly_g, " 'unusual' anomalies for Contracts"
 #Do the same thing for Transients
 
 
 training_data=[]        
 training_garages=[]           
-
                                            
 #dealing with transients
 #forming the training data set
@@ -369,26 +387,38 @@ for i in np.arange(0, len(training_data)):
                 break
 
 #print the anomaly results
-print "Anomaly category 2: Peak Occupancy for Transients"
-print "______________________________________________"
+#print "Anomaly category 2: Peak Occupancy for Transients"
+#print "_________________________________________________"
 
 if not os.path.exists("./transients"):
     os.makedirs("./transients")
+else:
+    shutil.rmtree("./transients")
 if not os.path.exists("./transients/zero_gap"):
     os.makedirs("./transients/zero_gap")
-if not os.path.exists("./transients/gap"):
-    os.makedirs("./transients/gap")
+if not os.path.exists("./transients/unusual"):
+    os.makedirs("./transients/unusual")
+
+
+total_anomaly_z = 0
+total_anomaly_g = 0
+
 for i in np.arange(0, len(training_data)):
     if (anomaly_present[i] == 1):
         #print garage_list[i].rstrip('\n'), " has 'zero gap' anomaly"
-        print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
+        #print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
+        total_anomaly_z = total_anomaly_z +1
         #extract from original dataset for plotting
         k=[]
         for m in np.arange(0,11):
             k.append(months_max_occ[m][training_garages[i]][1])
         plt.ylim(0,np.amax(k))
 
-        plt.plot(k)
+        plt.xticks(rotation=45)
+
+        plt.plot(dates, k)
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Transients)')
         
         filename = "./transients/zero_gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
         plt.savefig(filename)
@@ -396,20 +426,26 @@ for i in np.arange(0, len(training_data)):
 
     if (anomaly_present[i] == 2):
         #print garage_list[i].rstrip('\n'), " has 'gap' anomaly"
-        print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
+        #print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
+        total_anomaly_g = total_anomaly_g + 1
         #extract from original dataset for plotting
         k=[]
         for m in np.arange(0,11):
             k.append(months_max_occ[m][training_garages[i]][1])
         plt.ylim(0,np.amax(k))
 
-        plt.plot(k)
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,k)
+        plt.tight_layout()
+        plt.ylabel('Monthly Peak Occupancy (Transients)')
         
-        filename = "./transients/gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
+        filename = "./transients/unusual/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
         plt.savefig(filename)
         plt.clf()
 
-        
+print "Out of ", len(garage_list), " garages ", total_anomaly_z, " 'zero gap' and ", total_anomaly_g, " 'unusual' anomalies for Transients"
+
 #STAGE 3.2:  
 #Find anomalies in 1 year of peak occupancy with 1 day view 
 # skipping weekends for now
@@ -422,15 +458,17 @@ ndays = 335
 contracts_daily_peak=[]
 #go through each garage
 #line_index = 0
+
+training_garages=[]
+
 for i in np.arange(0, len(contracts)):
+    
+    if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 2)):
+        #print "No contract for ", garage_list[i]
+        continue
     #data_structure for a single garage
     temp_daily_peak = []
     
-    if (garage_info_occupancy[i] == 3):
-        #for empty garage, it will be all zeros
-        zeros = [0] * ndays
-        temp_daily_peak.append(zeros)
-        continue
     #TODO: determine first day when you start counting from,
     # Jan 1, 2016 was Friday
     day_index = 4
@@ -456,14 +494,10 @@ for i in np.arange(0, len(contracts)):
     #add the daily peak for the garage of the whole year to 
     #the master list
     contracts_daily_peak.append(temp_daily_peak)
+    training_garages.append(i)
     #print "done ", line_index
     #line_index = line_index + 1
     
-#print "total garages: ",len(contracts_daily_peak)
-#for i in contracts_daily_peak:
-#    print len(i)
-#print "Garage ", garage_list[1]
-
 #Anomaly Detection part
 
 anomaly_present = [0] * len(contracts_daily_peak)
@@ -477,7 +511,7 @@ for i in np.arange(0,len(contracts_daily_peak)):
 #Algorithm 2:  Check for non zero gaps, like previous.
 
 #TODO:  Did not handle garages where there was no data,
-#but we created synthetic data
+#but we created synthetic data (added, but double check later)
 
 #TODO: Probably there will be lot of non-zero gaps,
 #try to see if there is a pattern, eg the distance between the
@@ -486,7 +520,6 @@ for i in np.arange(0,len(contracts_daily_peak)):
 #First, normalize the dataset
 #TODO: This can be merged with the previous loop
 
-#TODO: create range of dates for x-axis python
 contracts_daily_peak_normalized=[]
 for i in contracts_daily_peak:
         t=map(float,i)
@@ -508,39 +541,216 @@ for i in np.arange(0,len(contracts_daily_peak_normalized)):
                 break
                 
 #print the results
-print "Anomaly category 3: DAILY Peak Occupancy for Contracts"
-print "______________________________________________"
+print "Anomaly category 3: DAILY Peak Occupancy"
+print "________________________________________"
 
 if not os.path.exists("./contracts_daily"):
     os.makedirs("./contracts_daily")
+else:
+    shutil.rmtree("./contracts_daily")
 if not os.path.exists("./contracts_daily/zero_gap"):
     os.makedirs("./contracts_daily/zero_gap")
-if not os.path.exists("./contracts_daily/gap"):
-    os.makedirs("./contracts_daily/gap")
+if not os.path.exists("./contracts_daily/unusual"):
+    os.makedirs("./contracts_daily/unusual")
+
+total_anomaly_z = 0
+total_anomaly_g = 0
+#create date ranges
+#TODO dynamic date range
+dates = pd.bdate_range('2016-1-1', '2016-11-30', freq='B')
+    
 for i in np.arange(0, len(contracts_daily_peak_normalized)):
     if (anomaly_present[i] == 1):
         #print garage_list[i].rstrip('\n'), " has 'zero gap' anomaly"
-        print garage_list[i].rstrip('\n'), " 'zero gap'"
+        #print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
 
+        total_anomaly_z = total_anomaly_z + 1
         plt.ylim(0,np.amax(contracts_daily_peak[i]))
 
-        plt.plot(contracts_daily_peak[i])
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,contracts_daily_peak[i])
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Contracts)') 
         
-        filename = "./contracts_daily/zero_gap/"+str(garage_list[i].rstrip('\n'))+".png"
+        filename = "./contracts_daily/zero_gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
         plt.savefig(filename)
         plt.clf()
 
     if (anomaly_present[i] == 2):
         #print garage_list[i].rstrip('\n'), " has 'gap' anomaly"
-        print garage_list[i].rstrip('\n'), "'gap'"
+        #print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
 
+        total_anomaly_g = total_anomaly_g + 1
         plt.ylim(0,np.amax(contracts_daily_peak[i]))
 
-        plt.plot(contracts_daily_peak[i])
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,contracts_daily_peak[i])
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Contracts)') 
         
-        filename = "./contracts_daily/gap/"+str(garage_list[i].rstrip('\n'))+".png"
+        filename = "./contracts_daily/unusual/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
         plt.savefig(filename)
         plt.clf()
+
+print "Out of ", len(garage_list), " garages ", total_anomaly_z, " 'zero gap' and ", total_anomaly_g, " 'unusual' anomalies for Contracts"
+
+#Do the same thing for "transients"
+
+#data_structure to hold daily peak occupancy of all garages
+transients_daily_peak=[]
+#go through each garage
+
+training_garages=[]
+
+for i in np.arange(0, len(transients)):
+    
+    if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 1)):
+        continue
+    #data_structure for a single garage
+    temp_daily_peak = []
+    
+    #TODO: determine first day when you start counting from,
+    # Jan 1, 2016 was Friday
+    day_index = 4
+    for j in np.arange(0, 335):
+        day_index = day_index +1
+        
+
+        if(day_index == 7):
+            day_index = 0
+            continue
+        if(day_index == 6):
+            continue
+        else:
+            #we are at the other 5 days of the week, calculate the peak for a day and add
+            lower = j*24
+            upper = lower+23
+            
+            temp_daily_peak.append(np.amax(transients[i][lower:upper]))
+            
+    
+    #add the daily peak for the garage of the whole year to 
+    #the master list
+    transients_daily_peak.append(temp_daily_peak)
+    training_garages.append(i)
+    
+#Anomaly Detection part
+
+anomaly_present = [0] * len(transients_daily_peak)
+
+#Algorithm 1:  If there are 0 in weekdays, there may be
+# something wrong
+for i in np.arange(0,len(transients_daily_peak)):
+    if 0 in transients_daily_peak[i]:
+        anomaly_present[i] = 1
+        
+#Algorithm 2:  Check for non zero gaps, like previous.
+
+#TODO:  Did not handle garages where there was no data,
+#but we created synthetic data (added, but double check later)
+
+#TODO: Probably there will be lot of non-zero gaps,
+#try to see if there is a pattern, eg the distance between the
+#the outliers is more or less same or not
+
+#First, normalize the dataset
+#TODO: This can be merged with the previous loop
+
+#TODO: create range of dates for x-axis python
+transients_daily_peak_normalized=[]
+for i in transients_daily_peak:
+        t=map(float,i)
+        transients_daily_peak_normalized.append(t/np.amax(t))
+for i in np.arange(0,len(transients_daily_peak_normalized)):
+    if ( anomaly_present[i] == 0):
+        p25 = np.percentile(transients_daily_peak_normalized[i], 25)
+        p75 = np.percentile(transients_daily_peak_normalized[i], 75)
+        iqr = np.subtract(*np.percentile(transients_daily_peak_normalized[i], [75, 25]))
+
+        #1.5 was too restrictive
+        lower = p25 - 3 * (p75 - p25)
+        upper = p75 + 3 * (p75 - p25)
+    
+        for t  in transients_daily_peak_normalized[i]:
+            if t < lower or t > upper:
+                #print t, " is not between ", lower, " and ", upper
+                anomaly_present[i] = 2
+                break
+
+#print the results
+#print "Anomaly category 4: DAILY Peak Occupancy for Transients"
+#print "______________________________________________"
+
+if not os.path.exists("./transients_daily"):
+    os.makedirs("./transients_daily")
+else:
+    shutil.rmtree("./transients_daily")
+if not os.path.exists("./transients_daily/zero_gap"):
+    os.makedirs("./transients_daily/zero_gap")
+if not os.path.exists("./transients_daily/unusual"):
+    os.makedirs("./transients_daily/unusual")
+if not os.path.exists("./transients_daily/ok"):
+    os.makedirs("./transients_daily/ok")
+    
+#create date ranges
+#TODO dynamic date range
+dates = pd.bdate_range('2016-1-1', '2016-11-30', freq='B')
+    
+total_anomaly_z = 0
+total_anomaly_g = 0
+
+for i in np.arange(0, len(transients_daily_peak_normalized)):
+    if (anomaly_present[i] == 1):
+        #print garage_list[i].rstrip('\n'), " has 'zero gap' anomaly"
+        #print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
+
+        total_anomaly_z =  total_anomaly_z + 1
+        plt.ylim(0,np.amax(transients_daily_peak[i]))
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,transients_daily_peak[i])
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Transient)')       
+        
+        filename = "./transients_daily/zero_gap/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
+        plt.savefig(filename)
+        plt.clf()
+
+    if (anomaly_present[i] == 2):
+        #print garage_list[i].rstrip('\n'), " has 'gap' anomaly"
+        #print garage_list[training_garages[i]].rstrip('\n'), "'gap'"
+
+        total_anomaly_g = total_anomaly_g + 1
+        plt.ylim(0,np.amax(transients_daily_peak[i]))
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,transients_daily_peak[i])
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Transient)') 
+        
+        filename = "./transients_daily/unusual/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
+        plt.savefig(filename)
+        plt.clf()
+    if (anomaly_present[i] == 0):
+        #print garage_list[i].rstrip('\n'), " has 'zero gap' anomaly"
+        #print garage_list[training_garages[i]].rstrip('\n'), " 'zero gap'"
+
+        plt.ylim(0,np.amax(transients_daily_peak_normalized[i]))
+        plt.xticks(rotation=45)
+
+        plt.plot(dates,transients_daily_peak_normalized[i])
+        plt.tight_layout()
+        plt.ylabel('Daily Peak Occupancy (Transient)')       
+        
+        filename = "./transients_daily/ok/"+str(garage_list[training_garages[i]].rstrip('\n'))+".png"
+        plt.savefig(filename)
+        plt.clf()
+
+print "Out of ", len(garage_list), " garages ", total_anomaly_z, " 'zero gap' and ", total_anomaly_g, " 'unusual' anomalies for Transients"
+
+
 
 '''
 #STAGE 3.3:  Apply Clustering
