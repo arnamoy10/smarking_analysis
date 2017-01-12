@@ -1,5 +1,19 @@
 # smarking_analysis
 
+Jan 11 2017:
+
+I have made two scripts:
+
+data_analysis.py - takes garage ID and a start date and end date as argument and produces analysis results depending on how many days given.
+
+		 e.g ->  for more than 6 months, it will do a monthly peak occupancy analysis, for 1-6 months, it will do a daily peak analysis, and for less than that, it will do an hourly analysis.
+
+For monthly and daily peak occupancy, I am using IQR emthod still and it works well so far.
+
+For hourly analysis per day (daily analysis), I have used SVDD, k means with 2 clusters and twitterd ESD based anomaly detection.  The Pycularity library works well for the twitter ESD analysis, but the thermometr library does not.  But the Pycularity library requires you to have R installed in your system.
+
+
+
 Jan 5 2017:  
 
 data_analysis.py :  Main file to do the data analysis
