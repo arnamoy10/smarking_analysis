@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html >
+<head>
+  <meta charset="UTF-8">
+  <title>Smarking Data Checking</title>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css">
+
+  <link rel='stylesheet prefetch' href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900|RobotoDraft:400,100,300,500,700,900'>
+<link rel='stylesheet prefetch' href='http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'>
+
+      <link rel="stylesheet" href="css/style.css">
+
+  
+</head>
+
+<body>
+  
+<!-- Form Mixin-->
+<!-- Input Mixin-->
+<!-- Button Mixin-->
+<!-- Pen Title-->
+<div class="pen-title">
+    <p><img src="logo-s.png"><h1>Smarking Data Checking</h1></p>
+</div>
+<!-- Form Module-->
+<div class="module form-module">
+  <div class="toggle"><i class="fa fa-times fa-pencil"></i>
+    <div class="tooltip">Help</div>
+  </div>
+  <div class="form">
+    <h2>Please Upload the garage list</h2>
+    <form enctype="multipart/form-data" action="/cgi-bin/data_analysis.py" method="post">
+      File: <input type="file" name="filename" />
+<input type="submit" value="Check Anomalies" />    </form>
+  </div>
+  <div class="form">
+    <h2>Help About the upload file</h2>
+    <p>You Have to upload a text file in the following format.</p>
+      <p></p><p></p>
+      <p>garage_id&nbsp;&nbsp;start_date&nbsp;&nbsp;end_date</p>
+      
+    <p>You can have multiple garage_id(s), each in a line of the file.
+    The date format should be YYYY-mm-dd for both start_date and end_date.</p>
+  </div>
+  <div class="cta"></div>
+</div>
+  <script src='http://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js'></script>
+
+    <script src="js/index.js"></script>
+
+</body>
+</html>
+
+<!--
+<!DOCTYPE html>
+<html>
+<body>
+
+<script src="js/addInput.js" language="Javascript" type="text/javascript"></script>
+    Garage ID &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;From &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; To <!--&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; Revenue &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Entries &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;Exits &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Count 
+<form method="GET" action="/cgi-bin/process.py">
+     <div id="dynamicInput" >
+          <input type="text" name="garage_name[]"> <input type="date" name="from[]"> <input type="date" name="to[]">
+    <br/>
+     </div>
+     <input type="button" value="Add another Garage" onClick="addInput('dynamicInput');"><br/>
+    <input type="submit" value="Check Garages">
+</form>
+   <form enctype="multipart/form-data" 
+                     action="/cgi-bin/data_analysis.py" method="post">
+   <p>File: <input type="file" name="filename" /></p>
+   <p><input type="submit" value="Upload" /></p>
+   </form>
+
+
+</body>
+</html>
+
+-->
