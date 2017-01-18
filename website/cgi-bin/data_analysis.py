@@ -25,6 +25,7 @@ import requests
 
 #twitter analysis for timeseries anomaly detection
 from pyculiarity import detect_ts
+from pyculiarity import detect_vec
 
 
 
@@ -57,6 +58,13 @@ garage_names=[]
 with open("garage_names") as f:
     garage_names= f.readlines()
     
+#get the previously reported false positives
+with open("false_positives") as f:
+    false_positives = [x.rstrip('\n') for x in f.readlines()]
+
+
+false_positives = set(false_positives)
+    
 #get the number of hours, necessary to download occupancy
 date_format = "%Y-%m-%d"
 
@@ -78,13 +86,33 @@ for line in garage_list:
 print """Content-Type: text/html\n
 <html>
 
-<head><meta charset="UTF-8"><title>Smarking checking</title> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css"><link rel='stylesheet prefetch' href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900|RobotoDraft:400,100,300,500,700,900'><link rel='stylesheet prefetch' href='http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'><link rel="stylesheet" href="/css/style.css"></head>
+<head><meta charset="UTF-8"><title>Smarking checking</title> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css"><link rel='stylesheet prefetch' href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900|RobotoDraft:400,100,300,500,700,900'><link rel='stylesheet prefetch' href='http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'><link rel="stylesheet" href="/css/style.css">
+<style>
+input[type=checkbox]:checked + label.strikethrough{
+  text-decoration: line-through;
+}
+.form-module submit {
+  cursor: pointer;
+  background: #33b5e5;
+  width: 100%;
+  border: 0;
+  padding: 10px 15px;
+  color: #ffffff;
+  -webkit-transition: 0.3s ease;
+  transition: 0.3s ease;
+}
+.form-module submit:hover {
+  background: #178ab4;
+}
+</style>
+</head>
 
 
 <body>"""
 
 print """<div class="pen-title">
-    <p><img src="/logo-s.png"><h2 style="color:darkcyan;font-size: 20px;">Here are the checking Results</h2></p></div>
+    <p><img src="/logo-s.png"><h2 style="color:darkcyan;font-size: 20px;">Here are the checking Results, please mark the false positives (if any) and commit your checks. </h2></p></div>
+<form method="post" action="/cgi-bin/process_check.py">
 """
 #print """</body>
 #</html>"""
@@ -148,7 +176,7 @@ for i in np.arange(0,len(garages)):
         continue
 
 
-    #print "Analyzing data..."
+    #print url
     #we have collected all the data
     #each datapoint is for an hour in a given day
     
@@ -165,9 +193,10 @@ for i in np.arange(0,len(garages)):
         if('Contract' in group):    
             contract = item.get("value")
             con = 1
-        elif('Transient' in group):
+        if('Transient' in group):
             transient = item.get("value")
             tran = 1
+    
 
     if ((con == 0) and (tran == 0)):
         garage_info_occupancy[line_index] = 3
@@ -186,6 +215,8 @@ for i in np.arange(0,len(garages)):
     #add the parsed result to the master list                           
     contracts.append(contract)                                          
     transients.append(transient)
+    
+    #print garages[i], garage_info_occupancy[i]
     
     #reset the values of flags
     con = 0
@@ -334,9 +365,23 @@ for i in np.arange(0,len(garages)):
     
             for ii in np.arange(0,len(anomaly_present)):
                 if anomaly_present[ii] == 1:
-                    print "<p>Zero gap for %s-%s " % (dates[ii].month,dates[ii].year)
+                    #create the value for the checkbox so that it can be stored for
+                    #future
+                    val = "con-"+str(garages[i])+"-"+str(dates[ii].month)+str(dates[ii].year)
+                    
+                    #check if it was previously reported as false positive
+                    if val in false_positives:
+                        continue
+                        
+                    print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s </label>' % (val,dates[ii].month,dates[ii].year)
                 if anomaly_present[ii] == 2:
-                    print "<p>Gap for %s-%s " % (dates[ii].month,dates[ii].year)
+                    val = "con-"+str(garages[i])+"-"+str(dates[ii].month)+str(dates[ii].year)
+                    
+                    #check if it was previously reported as false positive
+                    if val in false_positives:
+                        continue
+                        
+                    print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Gap for %s-%s </label> ' % (val,dates[ii].month,dates[ii].year)
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     #generate url
                     url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
@@ -407,9 +452,21 @@ for i in np.arange(0,len(garages)):
     
             for ii in np.arange(0,len(anomaly_present)):
                 if anomaly_present[ii] == 1:
-                    print "<p>Zero gap for %s-%s " % (dates[ii].month,dates[ii].year)
+                    val = "tran-"+str(garages[i])+"-"+str(dates[ii].month)+str(dates[ii].year)
+                    
+                    #check if it was previously reported as false positive
+                    if val in false_positives:
+                        continue
+                        
+                    print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s </label> ' % (val,dates[ii].month,dates[ii].year)
                 if anomaly_present[ii] == 2:
-                    print "<p>Gap for %s-%s " % (dates[ii].month,dates[ii].year)
+                    val = "tran-"+str(garages[i])+"-"+str(dates[ii].month)+str(dates[ii].year)
+                    
+                    #check if it was previously reported as false positive
+                    if val in false_positives:
+                        continue
+                        
+                    print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Gap for %s-%s </label>' % (val,dates[ii].month,dates[ii].year)
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     #generate url
                     url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
@@ -529,10 +586,22 @@ for i in np.arange(0,len(garages)):
             for ii in np.arange(0,len(anomaly_present)):
                 if anomaly_present[ii] == 1:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
-                        print "<p>Zero gap for %s-%s-%s " % (dates[ii].year,dates[ii].month,dates[ii].day)
+                        val = "con-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
                 if anomaly_present[ii] == 2:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
-                        print "<p>Gap for %s-%s-%s " % (dates[ii].year,dates[ii].month,dates[ii].day)
+                        val = "con-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough"> Gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         t_start_d = dates[ii] - timedelta(days=60)
@@ -633,10 +702,22 @@ for i in np.arange(0,len(garages)):
             for ii in np.arange(0,len(anomaly_present)):
                 if anomaly_present[ii] == 1:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
-                        print "<p>Zero gap for %s-%s-%s " % (dates[ii].year,dates[ii].month,dates[ii].day)
+                        val = "tran-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
                 if anomaly_present[ii] == 2:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
-                        print "<p>Gap for %s-%s-%s " % (dates[ii].year,dates[ii].month,dates[ii].day)
+                        val = "tran-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         t_start_d = dates[ii] - timedelta(days=60)
@@ -655,7 +736,9 @@ for i in np.arange(0,len(garages)):
     #Daily Occupancy                      #
     #######################################
     
+
     
+########Twitter old begin
     if (ndays > 1):
     
         print '<h2 style="color:darkcyan;font-size: 20px;">Daily Hourly Anomalies</h2>'
@@ -688,7 +771,7 @@ for i in np.arange(0,len(garages)):
                 if(day_index == 6):
                     continue
                 else:
-                    #we are at the other 5 days of the week, calculate the peak for a day and add
+                    #we are at the other 5 days of the week, calculate the occupancy for a day and add
                     lower = nn*24
                     upper = lower+23
             
@@ -734,137 +817,158 @@ for i in np.arange(0,len(garages)):
     #Treat each data point for a day as a 24-dimensional vector for 24 hours
     #Used SVDD to see which one are outliers
     
-        contracts_daily_normalized=[]
-        transients_daily_normalized=[]
 #####################
    #twitter detection
     #if contract is present
         if((garage_info_occupancy[i] == 0) or (garage_info_occupancy[i] == 1)):  
         
             for ss in np.arange(0, len(contracts_daily)):
-                for tt in contracts_daily[ss]:
-                    t=map(float,tt)
-                    contracts_daily_normalized.append(np.nan_to_num(t/np.amax(t)))
 
-
-                
-                dates = pd.bdate_range(start_date, periods=len(contracts_daily_normalized))
+                #contracts_daily[garage_index][day_index][hour_index]
+                #get the dates
+                dates = pd.bdate_range(start_date, periods=len(contracts_daily[0]))
+                #print dates
                 data=[]
+                hours=[]
  
                 index = 0
-                for ww in contracts_daily_normalized:
-                    temp_hours= pd.bdate_range(dates[index], periods=len(contracts_daily_normalized[0]),freq='H')
+    
+                #hard coding for one garage, sorry
+                #ww is a day
+                for ww in contracts_daily[0]:
+                   
+                    #create the hours for that day
+                    temp_hours= pd.bdate_range(dates[index], periods=len(ww),freq='H')
                     m=0
-            
-                    for t in ww:
-                        temp=[]
-                        temp.append(temp_hours[m])
-                        temp.append(t)
+                    #ww is a day
+                    #for each hour
+                    for hr in ww:
+                        hours.append(temp_hours[m])
+                        data.append(hr)
                         m=m+1
-                        data.append(temp)
+                        #data.append(temp)
                     index = index+1
-            
-            
-        #print data
-                twitter_example_data = pd.DataFrame(data)
-
-                results = detect_ts(twitter_example_data,
-                            max_anoms=0.02,
-                            direction='both',longterm=True)
-        
-                temp= results['anoms']
-            
+                    
                 print '<h3 style="font-weight: bold;">Contracts</h3>'
+                #print len(contracts_daily)
+                #print len(contracts_daily[0])
+                #print len(contracts_daily[0][0])
+                #print len(data)
+                #print len(hours)
+                #print len(contracts_daily[0])
+                #print len(contracts_daily[0][0])
                 
-          
-                #get all the dates so that wnique dates can be extracted
-                dates=[]
+                df1 = pd.Series( (v for v in data) )
+                results = detect_vec(df1, period = 120,
+                            max_anoms=0.02,
+                            direction='both')
+                temp= results['anoms']
+
+                indices=[]
                 for index, row in temp.iterrows():
-                    dates.append(row['timestamp'].date())
-            
-                df = pd.DataFrame({'date': dates})
+                    indices.append(row['timestamp'])
+                    
+                #now indices has all the indices of anomalies in the data.  
+                #get the dates now
+                result_dates=[]
+                for ii in indices:
+                    result_dates.append(hours[int(ii)].date())
+                    
+                #print result_dates
+                
+                df = pd.DataFrame({'date': result_dates})
                 df1=df.drop_duplicates('date')
-            
+                
                 for row in df1.iterrows():
                     if ((str(row[1].date.year)+str(row[1].date.month)+str(row[1].date.day)) not in holidays):
-                        print "<p>%s" % str(row[1].date)
-                        start_d = str(row[1].date - timedelta(days=5))
-                        end_d = str(row[1].date + timedelta(days=5))
+                        val = "con-"+str(garages[i])+"-"+str(row[1].date.year)+str(row[1].date.month)+str(row[1].date.day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row[1].date))
+                        start_d = str(row[1].date - timedelta(days=40))
+                        end_d = str(row[1].date + timedelta(days=40))
                         #generate url
                         url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                         #print url
                         print '<a href =%s target="_blank">verify</a></p>' % url
-                    
+            
+                
+                
         if((garage_info_occupancy[i] == 0) or (garage_info_occupancy[i] == 2)):  
     
-            #transients
-            for mm in np.arange(0, len(transients_daily)):
-                for nn in transients_daily[mm]:
-                    t=map(float,nn)
-                    transients_daily_normalized.append(np.nan_to_num(t/np.amax(t)))
-        
-                #create a date range for printing the anomaly results
-                dates = pd.bdate_range(start_date, periods=len(transients_daily_normalized))
-                #print len(dates)
-                index = 0
-                for kk in transients_daily_normalized:
-                    hours= pd.bdate_range(dates[index], periods=len(transients_daily_normalized[0]),freq='H')
-                    m=0
-                    for t in kk:
-                        #print str(hours[m])+","+str(t)
-                        m=m+1
-                    index = index+1
-             
-                #twitter detection
-                
-                dates = pd.bdate_range(start_date, periods=len(transients_daily_normalized))
+            for ss in np.arange(0, len(transients_daily)):
+
+                #transients_daily[garage_index][day_index][hour_index]
+                #get the dates
+                dates = pd.bdate_range(start_date, periods=len(transients_daily[0]))
+                #print dates
                 data=[]
+                hours=[]
  
                 index = 0
-                for ww in transients_daily_normalized:
-                    temp_hours= pd.bdate_range(dates[index], periods=len(transients_daily_normalized[0]),freq='H')
+    
+                #hard coding for one garage, sorry
+                #ww is a day
+                for ww in transients_daily[0]:
+                   
+                    #create the hours for that day
+                    temp_hours= pd.bdate_range(dates[index], periods=len(ww),freq='H')
                     m=0
-            
-                    for t in ww:
-                        temp=[]
-                        temp.append(temp_hours[m])
-                        temp.append(t)
+                    #ww is a day
+                    #for each hour
+                    for hr in ww:
+                        hours.append(temp_hours[m])
+                        data.append(hr)
                         m=m+1
-                        data.append(temp)
+                        #data.append(temp)
                     index = index+1
-            
-            
-            #print data
-                twitter_example_data = pd.DataFrame(data)
-
-        
-                results = detect_ts(twitter_example_data,
-                            max_anoms=0.02,
-                            direction='both',longterm=True)
-        
-                temp= results['anoms']
+                    
                 print '<h3 style="font-weight: bold;">Transients</h3>'
-          
-                #get all the dates so that wnique dates can be extracted
-                dates=[]
+                
+                df1 = pd.Series( (v for v in data) )
+                results = detect_vec(df1, period = 120,
+                            max_anoms=0.02,
+                            direction='both')
+                temp= results['anoms']
+
+                indices=[]
                 for index, row in temp.iterrows():
-                    dates.append(row['timestamp'].date())
-            
-                df = pd.DataFrame({'date': dates})
+                    indices.append(row['timestamp'])
+                    
+                #now indices has all the indices of anomalies in the data.  
+                #get the dates now
+                result_dates=[]
+                for ii in indices:
+                    result_dates.append(hours[int(ii)].date())
+                    
+                #print result_dates
+                
+                df = pd.DataFrame({'date': result_dates})
                 df1=df.drop_duplicates('date')
-            
+                
                 for row in df1.iterrows():
                     if ((str(row[1].date.year)+str(row[1].date.month)+str(row[1].date.day)) not in holidays):
-                        print "<p>%s " % str(row[1].date)
-                        start_d = str(row[1].date - timedelta(days=5))
-                        end_d = str(row[1].date + timedelta(days=5))
-                    
+                        val = "tran-"+str(garages[i])+"-"+str(row[1].date.year)+str(row[1].date.month)+str(row[1].date.day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row[1].date))
+                        
+                        start_d = str(row[1].date - timedelta(days=40))
+                        end_d = str(row[1].date + timedelta(days=40))
                         #generate url
                         url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                         #print url
-                        print '<a href =%s target="_blank">verify</a></p>' % url
-        #print "done ",line_index
-    line_index =  line_index + 1
+                        print '<a href =%s target="_blank">verify</a></p>' % url            
+                
+##########Twitter old end
+    line_index = line_index + 1
+
     
-print """</div></body>
+print """
+<input type="submit" value="Commit Checks" /> 
+</form></body>
 </html>"""
