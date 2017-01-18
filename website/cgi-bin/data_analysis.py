@@ -965,7 +965,230 @@ for i in np.arange(0,len(garages)):
                         print '<a href =%s target="_blank">verify</a></p>' % url            
                 
 ##########Twitter old end
+    
+    ############################
+    #   Overnight Occupancy    #
+    ############################
+    
+    #Heuristic:  We calculate the percentage of the number of parkers
+    #present during the time 12AM-5AM
+    #if there is a high spike in that, we have an anomaly
+    #There can be two reasons for this
+    #   1.  The whole day is flat so nighttime will be a high percentage (FP)
+    #   2.  The whole day is not flat but still a spike in night occupancy
+    #TODO:  Eliminate the days where peak daily occupancy is already reported.
+    
+    if (ndays > 1):
+    
+        print '<h2 style="color:darkcyan;font-size: 20px;">Daily Overnight Anomalies</h2>'
+        #data structure to hold the hourly data for the given days for
+        #the garages
+        contracts_daily = []
+        transients_daily = []
+    
+        training_garages_contracts = []
+        training_garages_transients = []
+    
+        #get day index of the week Sunday -> 0, Monday -> 1 etc.
+        day_index = start_date.weekday()
+    
+        #only populate data for the weekdays
+        for mm in np.arange(0, len(contracts)):
+            if((garage_info_occupancy[mm] == 3) or (garage_info_occupancy[mm] == 2)):
+                #print "No contract for ", garage_list[i]
+                break
+            #data_structure for a single garage
+            temp_daily = []
+        
+            for nn in np.arange(0, ndays):
+                day_index = day_index +1
+        
+
+                if(day_index == 7):
+                    day_index = 0
+                    continue
+                if(day_index == 6):
+                    continue
+                else:
+                    #we are at the other 5 days of the week, calculate the night occupancy 
+                    #as percentage of the whole day
+                    lower_n = nn*24
+                    upper_n = lower_n+5
+                    
+                    lower = nn*24
+                    upper = lower + 23
+                    
+                    sum_n = np.sum(contracts[mm][lower_n:upper_n+1])
+                    sum_all = np.sum(contracts[mm][lower:upper+1])  
+            
+                    temp_daily.append(sum_n/float(sum_all))
+        
+            contracts_daily.append(temp_daily)
+            training_garages_contracts.append(mm)
+    
+    
+        #for transients
+        day_index = start_date.weekday()
+    
+        for kk in np.arange(0, len(transients)):
+            if((garage_info_occupancy[kk] == 3) or (garage_info_occupancy[kk] == 1)):
+                #print "No contract for ", garage_list[i]
+                break
+            #data_structure for a single garage
+            temp_daily = []
+        
+            for ll in np.arange(0, ndays):
+                day_index = day_index +1
+        
+
+                if(day_index == 7):
+                    day_index = 0
+                    continue
+                if(day_index == 6):
+                    continue
+                else:
+                    #we are at the other 5 days of the week, calculate the night occupancy 
+                    #as percentage of the whole day
+                    lower_n = ll*24
+                    upper_n = lower_n+5
+                    
+                    lower = ll*24
+                    upper = lower + 23
+                    
+                    sum_n = np.sum(transients[kk][lower_n:upper_n+1])
+                    sum_all = np.sum(transients[kk][lower:upper+1])  
+            
+                    temp_daily.append(sum_n/float(sum_all))
+        
+            transients_daily.append(temp_daily)
+            training_garages_transients.append(kk)
+            
+    
+        #contracts/transients_daily[garage_index][day_index][hour_index]
+#twitter detection
+    #if contract is present
+        if((garage_info_occupancy[i] == 0) or (garage_info_occupancy[i] == 1)):  
+        
+            for ss in np.arange(0, len(contracts_daily)):
+
+                #contracts_daily[garage_index][day_index][hour_index]
+                #get the dates
+                #print dates
+                data=[]
+                hours=[]
+ 
+                index = 0
+    
+                #hard coding for one garage, sorry
+                #ww is a day
+                for ww in contracts_daily[0]:
+                   
+                    #create the hours for that day
+                    #temp_hours= pd.bdate_range(dates[index], periods=len(ww),freq='H')
+                    data.append(ww)
+                    
+                #for lala in data:    
+                #    print lala
+                    
+                print '<h3 style="font-weight: bold;">Contracts</h3>'
+                p25 = np.percentile(data, 25)
+                p75 = np.percentile(data, 75)
+                iqr = np.subtract(*np.percentile(data, [75, 25]))
+
+                #1.5 was too restrictive
+                lower = p25 - 3 * (p75 - p25)
+                upper = p75 + 3 * (p75 - p25)
+    
+                indices = []
+                for m in np.arange(0,len(data)):
+                    if ((round(data[m],2) < round(lower,2)) or (round(data[m],2) > round(upper, 2))): 
+                        indices.append(m)
+                        
+                #print
+                dates = pd.bdate_range(start_date, periods=len(data))
+                
+                #print indices  
+                #print dates[indices]
+                for row in dates[indices]:
+                    if ((str(row.date().year)+str(row.date().month)+str(row.date().day)) not in holidays):
+                        val = "con-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
+                        
+                        start_d = str(row.date() - timedelta(days=3))
+                        end_d = str(row.date() + timedelta(days=3))
+                        #generate url
+                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                        #print url
+                        print '<a href =%s target="_blank">verify</a></p>' % url                     
+            
+                
+                
+        if((garage_info_occupancy[i] == 0) or (garage_info_occupancy[i] == 2)):  
+    
+            for ss in np.arange(0, len(transients_daily)):
+
+                #contracts_daily[garage_index][day_index][hour_index]
+                #print dates
+                data=[]
+                hours=[]
+ 
+                index = 0
+    
+                #hard coding for one garage, sorry
+                #ww is a day
+                for ww in transients_daily[0]:
+                   
+                    #create the hours for that day
+                    #temp_hours= pd.bdate_range(dates[index], periods=len(ww),freq='H')
+                    data.append(ww)
+                    
+                #for lala in data:    
+                #    print lala
+                    
+                print '<h3 style="font-weight: bold;">Transients</h3>'
+                p25 = np.percentile(data, 25)
+                p75 = np.percentile(data, 75)
+                iqr = np.subtract(*np.percentile(data, [75, 25]))
+
+                #1.5 was too restrictive
+                lower = p25 - 3 * (p75 - p25)
+                upper = p75 + 3 * (p75 - p25)
+    
+                indices = []
+                for m in np.arange(0,len(data)):
+                    if ((round(data[m],2) < round(lower,2)) or (round(data[m],2) > round(upper, 2))): 
+                        indices.append(m)
+                        
+                #print
+                dates = pd.bdate_range(start_date, periods=len(data))
+                
+                #print indices  
+                for row in dates[indices]:
+                    if ((str(row.date().year)+str(row.date().month)+str(row.date().day)) not in holidays):
+                        val = "tran-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
+                        
+                        #check if it was previously reported as false positive
+                        if val in false_positives:
+                            continue
+                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
+                        
+                        start_d = str(row.date() - timedelta(days=3))
+                        end_d = str(row.date() + timedelta(days=3))
+                        #generate url
+                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                        #print url
+                        print '<a href =%s target="_blank">verify</a></p>' % url  
+                    
+                
     line_index = line_index + 1
+    
+    
+
+    
 
     
 print """
