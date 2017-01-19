@@ -149,6 +149,11 @@ for i in np.arange(0,len(garages)):
     contracts_duration=[]
     transients_duration=[]
     
+    #data structure to filter out overnight anomalies
+    #from daily peak anomalies
+    daily_peak_anomalies_con = []
+    daily_peak_anomalies_tran= []
+    
     try:
         datetime.strptime(start_dates[i], date_format)
         datetime.strptime(end_dates[i], date_format)
@@ -634,6 +639,7 @@ for i in np.arange(0,len(garages)):
                 for m in np.arange(0,len(contracts_daily_peak_normalized[ii])):
                     if ((round(contracts_daily_peak_normalized[ii][m],2) < round(lower,2)) or (round(contracts_daily_peak_normalized[ii][m],2) > round(upper, 2))):        
                         anomaly_present[m] = 2
+                        
                 
 
             dates = pd.bdate_range(start_date, periods=ndays)
@@ -662,6 +668,8 @@ for i in np.arange(0,len(garages)):
                 
     
             for ii in np.arange(0,len(anomaly_present)):
+            
+                #Zero Gap anomaly
                 if anomaly_present[ii] == 1:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         val = "con-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
@@ -671,6 +679,11 @@ for i in np.arange(0,len(garages)):
                             continue
                         
                         print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
+                        
+                        #also add the date to the data structure
+                        daily_peak_anomalies_con.append(dates[ii].date())
+                        
+                #Gap anomaly        
                 if anomaly_present[ii] == 2:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         val = "con-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
@@ -680,6 +693,10 @@ for i in np.arange(0,len(garages)):
                             continue
                         
                         print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough"> Gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
+                        
+                        #also add the date to the data structure
+                        daily_peak_anomalies_con.append(dates[ii].date())
+                        
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         t_start_d = dates[ii] - timedelta(days=60)
@@ -787,6 +804,10 @@ for i in np.arange(0,len(garages)):
                             continue
                         
                         print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Zero gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
+                        
+                        #also add the date to the data structure
+                        daily_peak_anomalies_tran.append(dates[ii].date())
+                        
                 if anomaly_present[ii] == 2:
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         val = "tran-"+str(garages[i])+"-"+str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)
@@ -796,6 +817,10 @@ for i in np.arange(0,len(garages)):
                             continue
                         
                         print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">Gap for %s-%s-%s </label>' % (val, dates[ii].year,dates[ii].month,dates[ii].day)
+                        
+                        #also add the date to the data structure
+                        daily_peak_anomalies_tran.append(dates[ii].date())
+                        
                 if ((anomaly_present[ii] == 1) or (anomaly_present[ii] == 2)):
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         t_start_d = dates[ii] - timedelta(days=60)
@@ -1189,19 +1214,20 @@ for i in np.arange(0,len(garages)):
                 #print dates[indices]
                 for row in dates[indices]:
                     if ((str(row.date().year)+str(row.date().month)+str(row.date().day)) not in holidays):
-                        val = "con-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
+                        if(row.date() not in daily_peak_anomalies_con):
+                            val = "con-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
                         
-                        #check if it was previously reported as false positive
-                        if val in false_positives:
-                            continue
-                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
+                            #check if it was previously reported as false positive
+                            if val in false_positives:
+                                continue
+                            print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
                         
-                        start_d = str(row.date() - timedelta(days=3))
-                        end_d = str(row.date() + timedelta(days=3))
-                        #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
-                        #print url
-                        print '<a href =%s target="_blank">verify</a></p>' % url                     
+                            start_d = str(row.date() - timedelta(days=3))
+                            end_d = str(row.date() + timedelta(days=3))
+                            #generate url
+                            url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                            #print url
+                            print '<a href =%s target="_blank">verify</a></p>' % url                     
             
                 
                 
@@ -1247,19 +1273,20 @@ for i in np.arange(0,len(garages)):
                 #print indices  
                 for row in dates[indices]:
                     if ((str(row.date().year)+str(row.date().month)+str(row.date().day)) not in holidays):
-                        val = "tran-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
+                        if(row.date() not in daily_peak_anomalies_tran):
+                            val = "tran-"+str(garages[i])+"-"+str(row.date().year)+str(row.date().month)+str(row.date().day)
+                            
+                            #check if it was previously reported as false positive
+                            if val in false_positives:
+                                continue
+                            print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
                         
-                        #check if it was previously reported as false positive
-                        if val in false_positives:
-                            continue
-                        print '<p><input type="checkbox" name="color" value="%s"><label class="strikethrough">%s</label>' % (val, str(row.date()))
-                        
-                        start_d = str(row.date() - timedelta(days=3))
-                        end_d = str(row.date() + timedelta(days=3))
-                        #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
-                        #print url
-                        print '<a href =%s target="_blank">verify</a></p>' % url                     
+                            start_d = str(row.date() - timedelta(days=3))
+                            end_d = str(row.date() + timedelta(days=3))
+                            #generate url
+                            url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                            #print url
+                            print '<a href =%s target="_blank">verify</a></p>' % url                     
                 
     
     #####################
