@@ -54,9 +54,11 @@ else:
     message = 'No file was uploaded'
     
 #get the garage names
-garage_names=[]
+garage_dict={}
 with open("garage_names") as f:
-    garage_names= f.readlines()
+    for line in f:
+        (key, val) = line.split()
+        garage_dict[int(key)] = val
     
 #get the previously reported false positives
 with open("false_positives") as f:
@@ -78,6 +80,12 @@ for line in garage_list:
     garages.append(string[0])
     start_dates.append(string[1])
     end_dates.append(string[2])
+    
+#get the garage_names for the IDs
+garage_names=[]
+for g in garages:
+    garage_names.append(garage_dict[int(g)])
+    
 
 #print garages
 #print start_dates
@@ -118,6 +126,8 @@ print """<div class="pen-title">
 #</html>"""
 #sys.exit(0)
 
+#print garage_names
+#print garages
 
 #Array to hold if there was data for occupancy present at the garage 
 # 0 -> everything present
@@ -135,6 +145,10 @@ for i in np.arange(0,len(garages)):
     print '<h1 style="color:darkcyan;font-size: 30px;">Garage ID: %s</h1><p></p><p></p>' % str(garages[i])
     contracts=[]
     transients=[]
+    
+    contracts_duration=[]
+    transients_duration=[]
+    
     try:
         datetime.strptime(start_dates[i], date_format)
         datetime.strptime(end_dates[i], date_format)
@@ -163,6 +177,68 @@ for i in np.arange(0,len(garages)):
     headers = {"Authorization":"Bearer vgrh8F1EuhQdVO2A1wQdCPFf38WHDHX-lXJR-2Dt"}
     #create the URL 
     url="https://my.smarking.net/api/ds/v3/garages/"+str(garages[i])+"/past/occupancy/from/"+start_dates[i]+"T00:00:00/"+str(duration_hours)+"/1h?gb=User+Type"
+
+
+    #get the response using the url
+    response = requests.get(url,headers=headers)
+    content = response.content
+
+    #print content
+    #see if content was received.  If nothing  received, exit
+    if (content == ""):
+        print "<p>No content received</p>"
+        continue
+
+
+    #print url
+    #we have collected all the data
+    #each datapoint is for an hour in a given day
+    try:
+        garage_info = json.loads(content)
+    except ValueError:
+        raise ValueError("No JSON Object received, please try again.")
+    
+    #objects to store the parsed result
+    contract = []
+    transient = []
+    
+    
+    #parse the JSON-formatted line
+    for item in garage_info["value"]:
+        group = str(item.get("group"))
+        if('Contract' in group):    
+            contract = item.get("value")
+            con = 1
+        if('Transient' in group):
+            transient = item.get("value")
+            tran = 1
+    
+
+    if ((con == 0) and (tran == 0)):
+        garage_info_occupancy[line_index] = 3
+        #print "no data for ", line_index
+        line_index = line_index + 1
+        continue
+    if (con == 0):
+        l = len(transient)
+        contract = [0] * l
+        garage_info_occupancy[line_index] = 2
+    if (tran == 0):
+        l = len(contract)
+        transient = [0] * l
+        garage_info_occupancy[line_index] = 1
+    
+    #add the parsed result to the master list                           
+    contracts.append(contract)                                          
+    transients.append(transient)
+    
+    #print garages[i], garage_info_occupancy[i]
+    
+    
+    #*************get the duration info***************
+    url = "https://my.smarking.net/api/ds/v3/garages/"+str(garages[i])+"/past/duration/between/"+start_dates[i]+"T00:00:00/"+end_dates[i]+"T00:00:00?bucketNumber=25&bucketInSeconds=600&gb=User+Type"
+    
+    #print url
 
 
     #get the response using the url
@@ -212,11 +288,13 @@ for i in np.arange(0,len(garages)):
         transient = [0] * l
         garage_info_occupancy[line_index] = 1
     
-    #add the parsed result to the master list                           
-    contracts.append(contract)                                          
-    transients.append(transient)
+    #add the parsed result to the master list  
+    #print contract
+    #print transient
     
-    #print garages[i], garage_info_occupancy[i]
+    contracts_duration.append(contract)                                          
+    transients_duration.append(transient)
+    
     
     #reset the values of flags
     con = 0
@@ -1181,14 +1259,42 @@ for i in np.arange(0,len(garages)):
                         #generate url
                         url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                         #print url
-                        print '<a href =%s target="_blank">verify</a></p>' % url  
-                    
+                        print '<a href =%s target="_blank">verify</a></p>' % url                     
                 
+    
+    #####################
+    #duration anomalies #
+    #####################
+    
+    print '<h2 style="color:darkcyan;font-size: 20px;">Duration Anomalies</h2>'
+    
+         
+    sum_t=np.sum(contracts_duration[0])+np.sum(transients_duration[0])
+    
+    sum_one_hour = 0
+    for iii in np.arange(0,6):
+        sum_one_hour = sum_one_hour + contracts_duration[0][iii] + transients_duration[0][iii]
+        
+    sum_ten_minutes = contracts_duration[0][0] + transients_duration[0][0]
+    
+    percent_one_hour = (sum_one_hour/float(sum_t))*100
+    percent_ten_minute = (sum_ten_minutes/float(sum_t))*100
+    
+    if (percent_one_hour > 60.0):
+        print "<p> %s percent one hour or less parking between %s and %s</p>" %(str(np.round(percent_one_hour,2)),str(start_dates[i]),str(end_dates[i]))
+    if (percent_ten_minute > 5.0):
+        print "<p> %s percent 10 minutes or less parking between %s and %s</p>" %(str(np.round(percent_ten_minute,2)),str(start_dates[i]),str(end_dates[i]))
+        
+    
     line_index = line_index + 1
-    
-    
 
     
+
+line_index=0
+con = 0
+tran = 0
+    
+
 
     
 print """
