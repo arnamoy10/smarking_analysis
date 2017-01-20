@@ -16,10 +16,14 @@ from datetime import datetime, timedelta
 from dateutil import relativedelta
 
 
-#from sklearn.cluster import DBSCAN
-#from sklearn.preprocessing import StandardScaler
-#from sklearn import svm
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn import svm
+from sklearn.cluster import KMeans
 import requests
+
+#twitter analysis for timeseries anomaly detection
+from pyculiarity import detect_ts
 
 
 contracts=[]
@@ -57,6 +61,8 @@ if delta.days == 0:
 else:
     duration_hours = (abs(delta.days)+1) * 24
 
+
+    
 #change the authentication token accordingly
 headers = {"Authorization":"Bearer vgrh8F1EuhQdVO2A1wQdCPFf38WHDHX-lXJR-2Dt"}
 
@@ -119,7 +125,7 @@ for i in [0]:
         garage_info_occupancy[line_index] = 3
         #print "no data for ", line_index
         line_index = line_index + 1
-        #continue
+        continue
     if (con == 0):
         l = len(transient)
         contract = [0] * l
@@ -211,8 +217,8 @@ if (total_months > 6):
                 temp_date = month_end + timedelta(days=1)
             month_index = month_index + 1
             
-        for i in np.arange(0, month_index+1):
-            months_max_occ.append(month_occupancies[i])
+        for j in np.arange(0, month_index+1):
+            months_max_occ.append(month_occupancies[j])
         #print months_max_occ
   
     #STAGE 3:  Anomaly Detection
@@ -356,176 +362,168 @@ if (total_months > 6):
 
 
 #STAGE 3.2:  
-#Find anomalies in 1 year of peak occupancy with 1 day view 
+#Find anomalies in 1 year of peak occupancy with DAILY view 
 # skipping weekends for now
 
 #populate the data for "contracts"
 
+
+
 delta= end_date - start_date
 ndays = abs(delta.days)+1
 
-#print ndays
+if (ndays > 20):
+    #data_structure to hold daily peak occupancy of all garages
+    contracts_daily_peak=[]
+    #go through each garage
+    #line_index = 0
 
-#data_structure to hold daily peak occupancy of all garages
-contracts_daily_peak=[]
-#go through each garage
-#line_index = 0
+    training_garages=[]
 
-training_garages=[]
-
-for i in np.arange(0, len(contracts)):
+    for i in np.arange(0, len(contracts)):
     
-    if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 2)):
-        #print "No contract for ", garage_list[i]
-        continue
-    #data_structure for a single garage
-    temp_daily_peak = []
+        if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 2)):
+            #print "No contract for ", garage_list[i]
+            continue
+        #data_structure for a single garage
+        temp_daily_peak = []
     
-    #get day index of the week Sunday -> 0, Monday -> 1 etc.
-    day_index = start_date.weekday()
+        #get day index of the week Sunday -> 0, Monday -> 1 etc.
+        day_index = start_date.weekday()
     
-    for j in np.arange(0, ndays):
-        day_index = day_index +1
+        for j in np.arange(0, ndays):
+            day_index = day_index +1
         
 
-        if(day_index == 7):
-            day_index = 0
-            continue
-        if(day_index == 6):
-            continue
-        else:
-            #we are at the other 5 days of the week, calculate the peak for a day and add
-            lower = j*24
-            upper = lower+23
+            if(day_index == 7):
+                day_index = 0
+                continue
+            if(day_index == 6):
+                continue
+            else:
+                #we are at the other 5 days of the week, calculate the peak for a day and add
+                lower = j*24
+                upper = lower+23
             
-            #print len(contracts[i])
-            #print lower, upper
-            temp_daily_peak.append(np.amax(contracts[i][lower:upper]))
+                temp_daily_peak.append(np.amax(contracts[i][lower:upper]))
             
     
-    #add the daily peak for the garage of the whole year to 
-    #the master list
-    contracts_daily_peak.append(temp_daily_peak)
-    training_garages.append(i)
-    #print "done ", line_index
-    #line_index = line_index + 1
+        #add the daily peak for the garage of the whole year to 
+        #the master list
+        contracts_daily_peak.append(temp_daily_peak)
+        training_garages.append(i)
     
-#print contracts_daily_peak
-    
-#Anomaly Detection part
+    #Anomaly Detection part
 
-#har coded for dealing with just one garage
-anomaly_present = [0] * len(contracts_daily_peak[0])
+    #hard coded for dealing with just one garage
+    anomaly_present = [0] * len(contracts_daily_peak[0])
 
-#Algorithm 1:  If there are 0 in weekdays, there may be
-# something wrong
-for i in np.arange(0,len(contracts_daily_peak)):
-    for j in np.arange(0,len(contracts_daily_peak[i])):
-        if(contracts_daily_peak[i][j] == 0):
-            anomaly_present[j] = 1
+    #Algorithm 1:  If there are 0 in weekdays, there may be
+    # something wrong
+    for i in np.arange(0,len(contracts_daily_peak)):
+        for j in np.arange(0,len(contracts_daily_peak[i])):
+            if(contracts_daily_peak[i][j] == 0):
+                anomaly_present[j] = 1
         
-#Algorithm 2:  Check for non zero gaps, like previous.
+    #Algorithm 2:  Check for non zero gaps, like previous.
+    #TODO:  Did not handle garages where there was no data,
+    #but we created synthetic data (added, but double check later)
 
-#TODO:  Did not handle garages where there was no data,
-#but we created synthetic data (added, but double check later)
+    #TODO: Probably there will be lot of non-zero gaps,
+    #try to see if there is a pattern, eg the distance between the
+    #the outliers is more or less same or not
+        
+    #First, normalize the dataset
+    #TODO: This can be merged with the previous loop
 
-#TODO: Probably there will be lot of non-zero gaps,
-#try to see if there is a pattern, eg the distance between the
-#the outliers is more or less same or not
-
-#First, normalize the dataset
-#TODO: This can be merged with the previous loop
-
-contracts_daily_peak_normalized=[]
-for i in contracts_daily_peak:
+    contracts_daily_peak_normalized=[]
+    for i in contracts_daily_peak:
         t=map(float,i)
         contracts_daily_peak_normalized.append(t/np.amax(t))
-for i in np.arange(0,len(contracts_daily_peak_normalized)):
-    #if ( anomaly_present[i] == 0):
-    p25 = np.percentile(contracts_daily_peak_normalized[i], 25)
-    p75 = np.percentile(contracts_daily_peak_normalized[i], 75)
-    iqr = np.subtract(*np.percentile(contracts_daily_peak_normalized[i], [75, 25]))
+    for i in np.arange(0,len(contracts_daily_peak_normalized)):
+        #if ( anomaly_present[i] == 0):
+        p25 = np.percentile(contracts_daily_peak_normalized[i], 25)
+        p75 = np.percentile(contracts_daily_peak_normalized[i], 75)
+        iqr = np.subtract(*np.percentile(contracts_daily_peak_normalized[i], [75, 25]))
 
         #1.5 was too restrictive
-    lower = p25 - 3 * (p75 - p25)
-    upper = p75 + 3 * (p75 - p25)
+        lower = p25 - 3 * (p75 - p25)
+        upper = p75 + 3 * (p75 - p25)
     
-    for m in np.arange(0,len(contracts_daily_peak_normalized[i])):
-        if ((round(contracts_daily_peak_normalized[i][m],2) < round(lower,2)) or (round(contracts_daily_peak_normalized[i][m],2) > round(upper, 2))):        
+        for m in np.arange(0,len(contracts_daily_peak_normalized[i])):
+            if ((round(contracts_daily_peak_normalized[i][m],2) < round(lower,2)) or (round(contracts_daily_peak_normalized[i][m],2) > round(upper, 2))):        
                 anomaly_present[m] = 2
                 
 
-dates = pd.bdate_range(start_date, periods=ndays)
+    dates = pd.bdate_range(start_date, periods=ndays)
 
-print "Anomaly category 2: DAILY Peak Occupancy"
-print "______________________________________________"
+    print "Anomaly category 2: DAILY Peak Occupancy"
+    print "________________________________________"
     
-for i in np.arange(0,len(anomaly_present)):
-    if anomaly_present[i] == 1:
-        print "Zero gap Contract for ",dates[i].day, dates[i].month,dates[i].year
-    if anomaly_present[i] == 2:
-        print "Gap Contract for ",dates[i].day, dates[i].month,dates[i].year
+    for i in np.arange(0,len(anomaly_present)):
+        if anomaly_present[i] == 1:
+            print "Zero gap Contract for ",dates[i].day, dates[i].month,dates[i].year
+        if anomaly_present[i] == 2:
+            print "Gap Contract for ",dates[i].day, dates[i].month,dates[i].year
                 
 
 
-#Do the same thing for "transients"
+    #Do the same thing for "transients"
 
-#data_structure to hold daily peak occupancy of all garages
-transients_daily_peak=[]
+    #data_structure to hold daily peak occupancy of all garages
+    transients_daily_peak=[]
 
-#go through each garage
+    #go through each garage
 
-training_garages=[]
+    training_garages=[]
 
-for i in np.arange(0, len(transients)):
+    for i in np.arange(0, len(transients)):
     
-    if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 2)):
-        #print "No contract for ", garage_list[i]
-        continue
-    #data_structure for a single garage
-    temp_daily_peak = []
+        if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 1)):
+            #print "No contract for ", garage_list[i]
+            continue
+        #data_structure for a single garage
+        temp_daily_peak = []
     
-    #get day index of the week Sunday -> 0, Monday -> 1 etc.
-    day_index = start_date.weekday()
+        #get day index of the week Sunday -> 0, Monday -> 1 etc.
+        day_index = start_date.weekday()
     
-    for j in np.arange(0, ndays):
-        day_index = day_index +1
+        for j in np.arange(0, ndays):
+            day_index = day_index +1
         
 
-        if(day_index == 7):
-            day_index = 0
-            continue
-        if(day_index == 6):
-            continue
-        else:
-            #we are at the other 5 days of the week, calculate the peak for a day and add
-            lower = j*24
-            upper = lower+23
-            
-            #print len(contracts[i])
-            #print lower, upper
-            temp_daily_peak.append(np.amax(transients[i][lower:upper]))
+            if(day_index == 7):
+                day_index = 0
+                continue
+            if(day_index == 6):
+                continue
+            else:
+                 #we are at the other 5 days of the week, calculate the peak for a day and add
+                lower = j*24
+                upper = lower+23
+
+                temp_daily_peak.append(np.amax(transients[i][lower:upper+1]))
             
     
-    #add the daily peak for the garage of the whole year to 
-    #the master list
-    transients_daily_peak.append(temp_daily_peak)
-    training_garages.append(i)
+        #add the daily peak for the garage of the whole year to 
+        #the master list
+        transients_daily_peak.append(temp_daily_peak)
+        training_garages.append(i)
     
     
-#Anomaly Detection part
+    #Anomaly Detection part
 
-#har coded for dealing with just one garage
-anomaly_present = [0] * len(transients_daily_peak[0])
+    #hard coded for dealing with just one garage
+    anomaly_present = [0] * len(transients_daily_peak[0])
 
-#Algorithm 1:  If there are 0 in weekdays, there may be
-# something wrong
-for i in np.arange(0,len(transients_daily_peak)):
-    for j in np.arange(0,len(transients_daily_peak[i])):
-        if(transients_daily_peak[i][j] == 0):
-            anomaly_present[j] = 1
+    #Algorithm 1:  If there are 0 in weekdays, there may be
+    # something wrong
+    for i in np.arange(0,len(transients_daily_peak)):
+        for j in np.arange(0,len(transients_daily_peak[i])):
+            if(transients_daily_peak[i][j] == 0):
+                anomaly_present[j] = 1
         
-#Algorithm 2:  Check for non zero gaps, like previous.
+    #Algorithm 2:  Check for non zero gaps, like previous.
 
 #TODO:  Did not handle garages where there was no data,
 #but we created synthetic data (added, but double check later)
@@ -537,30 +535,312 @@ for i in np.arange(0,len(transients_daily_peak)):
 #First, normalize the dataset
 #TODO: This can be merged with the previous loop
 
-transients_daily_peak_normalized=[]
-for i in transients_daily_peak:
-        t=map(float,i)
-        transients_daily_peak_normalized.append(t/np.amax(t))
-for i in np.arange(0,len(transients_daily_peak_normalized)):
-    #if ( anomaly_present[i] == 0):
-    p25 = np.percentile(transients_daily_peak_normalized[i], 25)
-    p75 = np.percentile(transients_daily_peak_normalized[i], 75)
-    iqr = np.subtract(*np.percentile(transients_daily_peak_normalized[i], [75, 25]))
+    transients_daily_peak_normalized=[]
+    for i in transients_daily_peak:
+            t=map(float,i)
+            transients_daily_peak_normalized.append(t/np.amax(t))
+    for i in np.arange(0,len(transients_daily_peak_normalized)):
+        #if ( anomaly_present[i] == 0):
+        p25 = np.percentile(transients_daily_peak_normalized[i], 25)
+        p75 = np.percentile(transients_daily_peak_normalized[i], 75)
+        iqr = np.subtract(*np.percentile(transients_daily_peak_normalized[i], [75, 25]))
 
         #1.5 was too restrictive
-    lower = p25 - 3 * (p75 - p25)
-    upper = p75 + 3 * (p75 - p25)
+        lower = p25 - 3 * (p75 - p25)
+        upper = p75 + 3 * (p75 - p25)
     
-    for m in np.arange(0,len(transients_daily_peak_normalized[i])):
-        if ((round(transients_daily_peak_normalized[i][m],2) < round(lower,2)) or (round(transients_daily_peak_normalized[i][m],2) > round(upper, 2))):        
+        for m in np.arange(0,len(transients_daily_peak_normalized[i])):
+            if ((round(transients_daily_peak_normalized[i][m],2) < round(lower,2)) or (round(transients_daily_peak_normalized[i][m],2) > round(upper, 2))):        
                 anomaly_present[m] = 2
                 
 
-dates = pd.bdate_range(start_date, periods=ndays)
+    dates = pd.bdate_range(start_date, periods=ndays)
 
 
-for i in np.arange(0,len(anomaly_present)):
-    if anomaly_present[i] == 1:
-        print "Zero gap Transient for ",dates[i].day, dates[i].month,dates[i].year
-    if anomaly_present[i] == 2:
-        print "Gap Transient for ",dates[i].day, dates[i].month,dates[i].year
+    for i in np.arange(0,len(anomaly_present)):
+        if anomaly_present[i] == 1:
+            print "Zero gap Transient for ",dates[i].day, dates[i].month,dates[i].year
+        if anomaly_present[i] == 2:
+            print "Gap Transient for ",dates[i].day, dates[i].month,dates[i].year
+            
+            
+#if the number of days is greater than one, do an hourly analysis.
+
+#here, apply clustering to detect anomalies.
+if (ndays > 1):
+    #print "# days between 1 and 20"
+    
+    #data structure to hold the hourly data for the given days for
+    #the garages
+    contracts_daily = []
+    transients_daily = []
+    
+    training_garages_contracts = []
+    training_garages_transients = []
+    
+    #get day index of the week Sunday -> 0, Monday -> 1 etc.
+    day_index = start_date.weekday()
+    
+    #only populate data for the weekdays
+    for i in np.arange(0, len(contracts)):
+        if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 2)):
+            #print "No contract for ", garage_list[i]
+            continue
+        #data_structure for a single garage
+        temp_daily = []
+        
+        for j in np.arange(0, ndays):
+            day_index = day_index +1
+        
+
+            if(day_index == 7):
+                day_index = 0
+                continue
+            if(day_index == 6):
+                continue
+            else:
+                #we are at the other 5 days of the week, calculate the peak for a day and add
+                lower = j*24
+                upper = lower+23
+            
+                temp_daily.append(contracts[i][lower:upper+1])
+        
+        contracts_daily.append(temp_daily)
+        training_garages_contracts.append(i)
+    
+    #print contracts_daily
+    
+    #for transients
+    day_index = start_date.weekday()
+    
+    for i in np.arange(0, len(transients)):
+        if((garage_info_occupancy[i] == 3) or (garage_info_occupancy[i] == 1)):
+            #print "No contract for ", garage_list[i]
+            continue
+        #data_structure for a single garage
+        temp_daily = []
+        
+        for j in np.arange(0, ndays):
+            day_index = day_index +1
+        
+
+            if(day_index == 7):
+                day_index = 0
+                continue
+            if(day_index == 6):
+                continue
+            else:
+                #we are at the other 5 days of the week, calculate the peak for a day and add
+                lower = j*24
+                upper = lower+23
+            
+                temp_daily.append(transients[i][lower:upper+1])
+        
+        transients_daily.append(temp_daily)
+        training_garages_transients.append(i)
+    
+    #contracts/transients_daily[garage_index][day_index][hour_index]
+
+    #detect anomalies
+    #Algorithm: 
+    #Treat each data point for a day as a 24-dimensional vector for 24 hours
+    #Used SVDD to see which one are outliers
+    
+    #print transients_daily
+    #print transients
+    
+    contracts_daily_normalized=[]
+    transients_daily_normalized=[]
+
+        
+    for i in np.arange(0, len(contracts_daily)):
+        for j in contracts_daily[i]:
+            t=map(float,j)
+            contracts_daily_normalized.append(t/np.amax(t))
+        #print contracts_daily_normalized
+        
+        
+        #one class svm (placeholder, as twitter's algo works best)
+        clf = svm.OneClassSVM(nu=0.95 * 0.25 + 0.05, kernel="rbf", gamma=0.05)
+        clf.fit(contracts_daily_normalized)
+        y_pred_svdd = clf.predict(contracts_daily_normalized)
+        
+        
+        #kmeans (placeholder, as twitter's algo works best)
+        km = KMeans(n_clusters = 2)
+        km.fit(contracts_daily_normalized)
+        y_pred_km = km.predict(contracts_daily_normalized)
+        
+        #print y_pred_km
+
+        #print y_pred.count(1)
+        #print y_pred.count(-1)
+        '''
+        #see which class has more members, that one is dominant and
+        #the other is outlier.
+        #TODO:  I may be wrong here, simply -1 may mean outlier in y_pred
+        ones =  np.count_nonzero(y_pred_km == 1) 
+        neg_ones = np.count_nonzero(y_pred_km == 0) 
+        
+        #create a date range for printing the anomaly results
+        dates = pd.bdate_range(start_date, periods=ndays)
+        print "Anomaly category 3: DAILY Occupancy"
+        print "________________________________________"
+        
+        print "Contracts:"
+        
+        if(ones > neg_ones):
+            #get the indices of outliers
+            indices = np.where(y_pred_km == 0)[0]
+            #print the dates where there are anomalies
+            for i in indices:
+                print dates[i].year, dates[i].month, dates[i].day
+        else:
+            #get the indices of outliers
+            indices = np.where(y_pred_km == 1)[0]
+            #print the dates where there are anomalies
+            for i in indices:
+                print dates[i].year, dates[i].month, dates[i].day
+        '''
+#####################
+   #twitter detection
+                
+        dates = pd.bdate_range(start_date, periods=len(contracts_daily_normalized))
+        data=[]
+ 
+        index = 0
+        for i in contracts_daily_normalized:
+            temp_hours= pd.bdate_range(dates[index], periods=len(contracts_daily_normalized[0]),freq='H')
+            m=0
+            
+            for t in i:
+                temp=[]
+                temp.append(temp_hours[m])
+                temp.append(t)
+                m=m+1
+                data.append(temp)
+            index = index+1
+            
+            
+        #print data
+        twitter_example_data = pd.DataFrame(data)
+        #print twitter_example_data
+        #twitter_example_data = pd.read_csv('temp_data')
+        
+        #print twitter_example_data
+        
+        results = detect_ts(twitter_example_data,
+                    max_anoms=0.02,
+                    direction='both')
+        #print results
+        
+        temp= results['anoms']
+        print 'from twitter, contracts'
+        
+        #get all the dates so that wnique dates can be extracted
+        dates=[]
+        for index, row in temp.iterrows():
+            dates.append(row['timestamp'].date())
+                
+    
+    #transients
+    for i in np.arange(0, len(transients_daily)):
+        for j in transients_daily[i]:
+            t=map(float,j)
+            transients_daily_normalized.append(t/np.amax(t))
+        
+        #create a date range for printing the anomaly results
+        #print "Now"
+        #print len(transients_daily_normalized), len(transients_daily_normalized[0])
+        dates = pd.bdate_range(start_date, periods=len(transients_daily_normalized))
+        #print len(dates)
+        index = 0
+        for i in transients_daily_normalized:
+            hours= pd.bdate_range(dates[index], periods=len(transients_daily_normalized[0]),freq='H')
+            m=0
+            for t in i:
+                #print str(hours[m])+","+str(t)
+                m=m+1
+            index = index+1
+        '''
+        #one class svm, gamma did not have an effect on results (placeholder, as twitter's algo works best)
+        #clf = svm.OneClassSVM(nu=0.95 * 0.25 + 0.05, kernel="rbf", gamma=0.05)
+        #clf.fit(contracts_daily_normalized)
+        #y_pred_svdd = clf.predict(contracts_daily_normalized)
+        
+        
+        #kmeans (less # false positives than SVDD, but still a lot) (placeholder, as twitter's algo works best)
+        #tol does not have an effect
+        km = KMeans(n_clusters = 2)
+        km.fit(transients_daily_normalized)
+        y_pred_km = km.predict(transients_daily_normalized)
+        
+        
+        #see which class has more members, that one is dominant and
+        #the other is outlier.
+        #TODO:  I may be wrong here, simply 0 may mean outlier in y_pred
+        ones =  np.count_nonzero(y_pred_km == 1) 
+        neg_ones = np.count_nonzero(y_pred_km == 0) 
+        
+        #create a date range for printing the anomaly results
+        dates = pd.bdate_range(start_date, periods=ndays)
+        
+        print "Transients:"
+        
+        if(ones > neg_ones):
+            #get the indices of outliers
+            indices = np.where(y_pred_km == 0)[0]
+            #print the dates where there are anomalies
+            for i in indices:
+                print dates[i].year, dates[i].month, dates[i].day
+        else:
+            #get the indices of outliers
+            indices = np.where(y_pred_km == 1)[0]
+            #print the dates where there are anomalies
+            for i in indices:
+                print dates[i].year, dates[i].month, dates[i].day
+        '''        
+        #twitter detection
+                
+        dates = pd.bdate_range(start_date, periods=len(transients_daily_normalized))
+        data=[]
+ 
+        index = 0
+        for i in transients_daily_normalized:
+            temp_hours= pd.bdate_range(dates[index], periods=len(transients_daily_normalized[0]),freq='H')
+            m=0
+            
+            for t in i:
+                temp=[]
+                temp.append(temp_hours[m])
+                temp.append(t)
+                m=m+1
+                data.append(temp)
+            index = index+1
+            
+            
+        #print data
+        twitter_example_data = pd.DataFrame(data)
+        #print twitter_example_data
+        #twitter_example_data = pd.read_csv('temp_data')
+        
+        #print twitter_example_data
+        
+        results = detect_ts(twitter_example_data,
+                    max_anoms=0.02,
+                    direction='both')
+        #print results
+        
+        temp= results['anoms']
+        print 'from twitter, transients'
+        
+        #get all the dates so that wnique dates can be extracted
+        dates=[]
+        for index, row in temp.iterrows():
+            dates.append(row['timestamp'].date())
+            
+        df = pd.DataFrame({'date': dates})
+        df1=df.drop_duplicates('date')
+        
+        for row in df1.iterrows():
+            print row['date']
