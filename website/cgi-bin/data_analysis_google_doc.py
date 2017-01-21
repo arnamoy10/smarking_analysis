@@ -1,13 +1,28 @@
 #!/usr/bin/python
 
-import cgi, os
-import cgitb; cgitb.enable()
+
 
 import sys
+
+print """Content-Type: text/html\n
+<html>
+
+<head><meta charset="UTF-8"><title>Smarking checking</title> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css"><link rel='stylesheet prefetch' href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900|RobotoDraft:400,100,300,500,700,900'><link rel='stylesheet prefetch' href='http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'><link rel="stylesheet" href="/css/style.css">
+</head>
+
+"""
+
+print """
+<body>
+<div class="pen-title">
+    <p><img src="/logo-s.png"><h2 style="color:darkcyan;font-size: 20px;">Please hang on while we run our analysis. </h2></p></div>
+"""
+sys.stdout.flush()
     
 
 #print "Importing libraries"
-import os
+import cgi, os
+import cgitb; cgitb.enable()
 import json
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,11 +88,14 @@ else:
     message = 'No file was uploaded'
     
 #get the garage names
-garage_dict={}
+garage_name_dict={}
+garage_url_dict={}
+
 with open("garage_names") as f:
     for line in f:
-        (key, val) = line.split()
-        garage_dict[int(key)] = val
+        (key, url, name) = line.split(",")
+        garage_name_dict[int(key)] = name
+        garage_url_dict[int(key)] = url
     
 #get the previously reported false positives
 with open("false_positives") as f:
@@ -102,27 +120,17 @@ for line in garage_list:
     
 #get the garage_names for the IDs
 garage_names=[]
+garage_urls=[]
 for g in garages:
-    garage_names.append(garage_dict[int(g)])
+    garage_names.append(garage_name_dict[int(g)])
+    garage_urls.append(garage_url_dict[int(g)])
     
 
 #print garages
 #print start_dates
 #print end_dates
 
-print """Content-Type: text/html\n
-<html>
 
-<head><meta charset="UTF-8"><title>Smarking checking</title> <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css"><link rel='stylesheet prefetch' href='http://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700,900|RobotoDraft:400,100,300,500,700,900'><link rel='stylesheet prefetch' href='http://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css'><link rel="stylesheet" href="/css/style.css">
-</head>
-
-"""
-
-print """
-<body>
-<div class="pen-title">
-    <p><img src="/logo-s.png"><h2 style="color:darkcyan;font-size: 20px;">Thank you, the error checking results has been saved <a href="https://docs.google.com/spreadsheets/d/1zZ0XS0yDKLK9YkWeimEgv41u-7EP6_YzsyHPp_o-MBs/edit?usp=sharing">here</a> </h2></p></div>
-"""
 
 #</html>"""
 #sys.exit(0)
@@ -165,7 +173,7 @@ def get_credentials():
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def write_to_google_doc(garage_id):
+def write_to_google_doc(garage_name):
     """writes to the spreadsheet
     """
     credentials = get_credentials()
@@ -176,22 +184,22 @@ def write_to_google_doc(garage_id):
                               discoveryServiceUrl=discoveryUrl)
 
     spreadsheetId = '1zZ0XS0yDKLK9YkWeimEgv41u-7EP6_YzsyHPp_o-MBs'
-    rangeName = garage_id +'!A2:E'
+    rangeName = garage_name +'!A2:E'
     #print rangeName
-    result = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheetId, range=rangeName).execute()
-    values = result.get('values', [])
+    #sys.stdout.flush()
+    #result = service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=rangeName).execute()
+    #values = result.get('values', [])
 
     #get the already present number of rows
-    num_rows = 0
-    if not values:
+    #num_rows = 0
+    #if not values:
         #print('No data found.')
         #placeholder
-        xaaa = 0
-    else:
+        #xaaa = 0
+    #else:
         #print('Name, Major:')
-        for row in values:
-            num_rows = num_rows + 1
+        #for row in values:
+            #num_rows = num_rows + 1
             # Print columns
             #print('%s, %s, %s' % (row[0], row[1], row[2]))
     
@@ -210,7 +218,8 @@ def write_to_google_doc(garage_id):
 #TODO: take out the loop and fix indentation
 
 for i in np.arange(0,len(garages)):
-    #print "processing ",garages[i]
+    print "<p style='color:darkcyan;font-size: 16px;'>    Processing Garage", garages[i],"</p>"
+    sys.stdout.flush()
     #print '<h1 style="color:darkcyan;font-size: 30px;">Garage ID: %s</h1><p></p><p></p>' % str(garages[i])
     contracts=[]
     transients=[]
@@ -524,7 +533,7 @@ for i in np.arange(0,len(garages)):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "contract-zero-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -536,7 +545,7 @@ for i in np.arange(0,len(garages)):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "contract-unusual-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -611,7 +620,7 @@ for i in np.arange(0,len(garages)):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "transient-zero-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -623,7 +632,7 @@ for i in np.arange(0,len(garages)):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "transient-unusual-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -755,7 +764,7 @@ for i in np.arange(0,len(garages)):
                         end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
                     
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
                         temp_anomaly.append(url)
@@ -779,7 +788,7 @@ for i in np.arange(0,len(garages)):
                         end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
                     
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
                         temp_anomaly.append(url)
@@ -887,7 +896,7 @@ for i in np.arange(0,len(garages)):
                         end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
                     
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
                         temp_anomaly.append(url)
@@ -905,7 +914,7 @@ for i in np.arange(0,len(garages)):
                     if ((str(dates[ii].year)+str(dates[ii].month)+str(dates[ii].day)) not in holidays):
                         temp_anomaly=[]
                         mon = str(dates[ii].year)+"-"+str(dates[ii].month)+"-"+str(dates[ii].day)
-                        anom_type = "transients-usual-daily-peak"
+                        anom_type = "transients-unusual-daily-peak"
                         t_start_d = dates[ii] - timedelta(days=60)
                         t_end_d = dates[ii] + timedelta(days=60)
                     
@@ -913,7 +922,7 @@ for i in np.arange(0,len(garages)):
                         end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
                     
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
                         temp_anomaly.append(url)
@@ -1081,7 +1090,7 @@ for i in np.arange(0,len(garages)):
                         start_d = str(row[1].date - timedelta(days=40))
                         end_d = str(row[1].date + timedelta(days=40))
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                     
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
@@ -1155,7 +1164,7 @@ for i in np.arange(0,len(garages)):
                         start_d = str(row[1].date - timedelta(days=40))
                         end_d = str(row[1].date + timedelta(days=40))
                         #generate url
-                        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                     
                         temp_anomaly.append(mon)
                         temp_anomaly.append(anom_type)
@@ -1318,7 +1327,7 @@ for i in np.arange(0,len(garages)):
                             start_d = str(row.date() - timedelta(days=3))
                             end_d = str(row.date() + timedelta(days=3))
                             #generate url
-                            url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                            url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                     
                             temp_anomaly.append(mon)
                             temp_anomaly.append(anom_type)
@@ -1379,7 +1388,7 @@ for i in np.arange(0,len(garages)):
                             start_d = str(row.date() - timedelta(days=3))
                             end_d = str(row.date() + timedelta(days=3))
                             #generate url
-                            url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
+                            url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?occupancyType=regular&fromDateStr="+start_d+"&toDateStr="+end_d
                     
                             temp_anomaly.append(mon)
                             temp_anomaly.append(anom_type)
@@ -1411,7 +1420,7 @@ for i in np.arange(0,len(garages)):
         start_d = str(start_dates[i])
         end_d = str(row.date() + timedelta(days=3))
         #generate url
-        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_d+"&toDateStr="+end_d
+        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_d+"&toDateStr="+end_d
                     
         temp_anomaly.append(mon)
         temp_anomaly.append(anom_type)
@@ -1426,7 +1435,7 @@ for i in np.arange(0,len(garages)):
         start_d = str(start_dates[i])
         end_d = str(row.date() + timedelta(days=3))
         #generate url
-        url = "https://my.smarking.net/rt/"+garage_names[i].rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_d+"&toDateStr="+end_d
+        url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_d+"&toDateStr="+end_d
                     
         temp_anomaly.append(mon)
         temp_anomaly.append(anom_type)
@@ -1438,11 +1447,14 @@ for i in np.arange(0,len(garages)):
     
     
     line_index = line_index + 1
+    
+    argument=str(garage_names[i].rstrip("\n"))+"_"+str(garages[i].rstrip("\n"))
 
-    write_to_google_doc(garages[i])
+    write_to_google_doc(argument)
     #print anomalies_for_google_docs
 
 print """
+<br><br><h2 style="color:darkcyan;font-size: 20px;">The analysis results has been saved <a href="https://docs.google.com/spreadsheets/d/1zZ0XS0yDKLK9YkWeimEgv41u-7EP6_YzsyHPp_o-MBs/edit?usp=sharing" target = _blank>here</a></h2><br><br>
 <p><a href = "../index.html">Go back to home page</a></p>
 </body>
 </html>"""
