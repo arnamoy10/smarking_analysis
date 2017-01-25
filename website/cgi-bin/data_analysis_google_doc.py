@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 
-
 import sys
 
 print """Content-Type: text/html\n
@@ -210,7 +209,7 @@ def write_to_google_doc(garage_name):
     
     result = service.spreadsheets().values().append(
             spreadsheetId=spreadsheetId, range=rangeName,
-            valueInputOption='USER_ENTERED', body=body).execute()
+            valueInputOption='RAW', body=body).execute()
 
 #We do one garage at a time so, just one iteration is fine
 #TODO: take out the loop and fix indentation
@@ -273,7 +272,7 @@ def get_occupancy_data():
     if ((con == 0) and (tran == 0)):
         garage_info_occupancy = 3
         print "<br><br><p style='color:darkcyan;font-size: 20px;'>No Occupancy data present for this garage for the given time</p>"
-        sys.exit(0)
+        return
     if (con == 0):
         l = len(transient_occupancy)
         contract_occupancy = [0] * l
@@ -291,6 +290,8 @@ def get_duration_data():
     #had to add 1 with the end _date because the midnight of the supplied end date goes to
     #end_date + 1
     url = "https://my.smarking.net/api/ds/v3/garages/"+garage_id+"/past/duration/between/"+start_date_supplied+"T00:00:00/"+str((pd.to_datetime(end_date_supplied)+timedelta(1)).date())+"T00:00:00?bucketNumber=25&bucketInSeconds=600&gb=User+Type"
+    
+    
 
     #get the response using the url
     response = requests.get(url,headers=headers)
@@ -328,7 +329,7 @@ def get_duration_data():
     if ((con_dur == 0) and (tran_dur == 0)):
         garage_info_duration = 3
         print "<p>No duration data for this garage</p>"
-        sys.exit(0)
+        return
     if (con_dur == 0):
         l = len(transient_duration)
         contract_duration = [0] * l
@@ -412,10 +413,7 @@ def calculate_monthly_peak_anomaly(total_months):
             #TODO take out the loop
             for ii in np.arange(0, 1):
                 #TODO take this condition to the beginning of function
-                if((garage_info_occupancy == 3) or (garage_info_occupancy == 2)):
-                    #no contract present
-                    break
-                    t = []                                      
+                t = []                                      
                 for jj in np.arange(0, total_months+1):
                     t.append(months_max_occ[jj][ii][0])
                     #normalize
@@ -466,7 +464,7 @@ def calculate_monthly_peak_anomaly(total_months):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "contract-zero-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -478,7 +476,7 @@ def calculate_monthly_peak_anomaly(total_months):
                     temp_anomaly=[]
                     mon = str(dates[ii].year)+"-"+str(dates[ii].month)
                     anom_type = "contract-unusual-monthly-peak"
-                    url = "https://my.smarking.net/rt/"+garage_urls[i].rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_dates[i]+"&toDateStr="+end_dates[i]
+                    url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Monthly&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
                     temp_anomaly.append(mon)
                     temp_anomaly.append(anom_type)
                     temp_anomaly.append(url)
@@ -510,8 +508,9 @@ def calculate_monthly_peak_anomaly(total_months):
                 #    training_data.append(t1/np.amax(t1))
                 #else:
                 #    training_data.append(t1)
-                training_data.append(t1)                                                 
-                                
+                training_data.append(t1)
+            
+            #print training_data                    
     
     
             anomaly_present = [0] * len(training_data[ii])
@@ -653,11 +652,7 @@ def calculate_daily_peak_anomaly(ndays):
                             temp_anomaly=[]
                             mon = str(dates[ii].year)+"-"+str(dates[ii].month)+"-"+str(dates[ii].day)
                             anom_type = "contracts-zero-daily-peak"
-                            t_start_d = dates[ii] - timedelta(days=60)
-                            t_end_d = dates[ii] + timedelta(days=60)
-                    
-                            start_d = str(t_start_d.year)+"-"+str(t_start_d.month)+"-"+str(t_start_d.day)
-                            end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
+                        
                     
                             #generate url
                             url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
@@ -677,12 +672,7 @@ def calculate_daily_peak_anomaly(ndays):
                             temp_anomaly=[]
                             mon = str(dates[ii].year)+"-"+str(dates[ii].month)+"-"+str(dates[ii].day)
                             anom_type = "contracts-unusual-daily-peak"
-                            t_start_d = dates[ii] - timedelta(days=60)
-                            t_end_d = dates[ii] + timedelta(days=60)
-                    
-                            #TODO Check, probably we did not use these variables
-                            start_d = str(t_start_d.year)+"-"+str(t_start_d.month)+"-"+str(t_start_d.day)
-                            end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
+                            
                     
                             #generate url
                             url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
@@ -781,12 +771,7 @@ def calculate_daily_peak_anomaly(ndays):
                             temp_anomaly=[]
                             mon = str(dates[ii].year)+"-"+str(dates[ii].month)+"-"+str(dates[ii].day)
                             anom_type = "transients-zero-daily-peak"
-                            t_start_d = dates[ii] - timedelta(days=60)
-                            t_end_d = dates[ii] + timedelta(days=60)
-                        
-                            #TODO: check, probably did not use this
-                            start_d = str(t_start_d.year)+"-"+str(t_start_d.month)+"-"+str(t_start_d.day)
-                            end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
+                            
                     
                             #generate url
                             url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
@@ -805,11 +790,7 @@ def calculate_daily_peak_anomaly(ndays):
                             temp_anomaly=[]
                             mon = str(dates[ii].year)+"-"+str(dates[ii].month)+"-"+str(dates[ii].day)
                             anom_type = "transients-unusual-daily-peak"
-                            t_start_d = dates[ii] - timedelta(days=60)
-                            t_end_d = dates[ii] + timedelta(days=60)
-                    
-                            start_d = str(t_start_d.year)+"-"+str(t_start_d.month)+"-"+str(t_start_d.day)
-                            end_d = str(t_end_d.year)+"-"+str(t_end_d.month)+"-"+str(t_end_d.day)
+                            
                     
                             #generate url
                             url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/occupancy?granularity=Daily&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
@@ -1260,7 +1241,7 @@ def calculate_duration_anomalies():
         anom_type = str(percent_one_hour)+" % one hour parkers"
 
         #generate url
-        url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
+        url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/duration-distribution?bucketInMinutes=10&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
                     
         temp_anomaly.append(mon)
         temp_anomaly.append(anom_type)
@@ -1274,7 +1255,7 @@ def calculate_duration_anomalies():
         anom_type = str(percent_ten_minute)+" % ten minute parkers"
 
         #generate url
-        url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"duration-distribution?bucketInMinutes=10&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
+        url = "https://my.smarking.net/rt/"+garage_url.rstrip('\n')+"/duration-distribution?bucketInMinutes=10&fromDateStr="+start_date_supplied+"&toDateStr="+end_date_supplied
                     
         temp_anomaly.append(mon)
         temp_anomaly.append(anom_type)
@@ -1377,6 +1358,7 @@ def main():
     #####################    
          
     calculate_duration_anomalies()
+    #print anomalies_for_google_docs
     
     argument=str(garage_name.rstrip("\n"))+"_"+str(garage_id.rstrip("\n"))
 
